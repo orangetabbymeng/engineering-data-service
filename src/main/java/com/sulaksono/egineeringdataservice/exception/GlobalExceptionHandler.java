@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -34,6 +35,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorBody> handleMissingPart(MissingServletRequestPartException ex) {
         return ResponseEntity.badRequest()
                 .body(new ErrorBody("Required part '" + ex.getRequestPartName() + "' is missing"));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorBody> handleValidation(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + " " + error.getDefaultMessage())
+                .orElse("Invalid request");
+        return ResponseEntity.badRequest().body(new ErrorBody(message));
     }
 
     /* ---------------------------------------------------------------

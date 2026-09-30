@@ -10,9 +10,9 @@
     </parent>
     <groupId>com.sulaksono</groupId>
     <artifactId>engineering-data-service</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <name>file-ingestor-service</name>
-    <description>file-ingestor-service</description>
+    <version>1.5.0-SNAPSHOT</version>
+    <name>engineering-data-service</name>
+    <description>engineering-data-service</description>
     <url/>
     <licenses>
         <license>

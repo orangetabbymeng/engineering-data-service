@@ -32,8 +32,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Upload: embedding-user + admins
-                        .requestMatchers(HttpMethod.POST, "/api/upload/**")
+                        // Upload and semantic search: embedding-user + admins
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/files/upload",
+                                "/api/embeddings/search")
                         .hasAnyRole("embedding-user", "embedding-admin", "assistant-admin")
 
                         // Everything else under /api/**: admins only
@@ -67,40 +69,39 @@ public class SecurityConfig {
      */
     @Bean
     public Converter<Jwt, Collection<GrantedAuthority>> keycloakRolesConverter() {
-        return jwt -> {
-            Set<GrantedAuthority> mapped = new HashSet<>();
+        return this::extractKeycloakAuthorities;
+    }
 
-            // realm_access.roles
-            Object realmAccessObj = jwt.getClaim("realm_access");
-            if (realmAccessObj instanceof Map<?, ?> realmAccess) {
-                Object rolesObj = realmAccess.get("roles");
-                if (rolesObj instanceof Collection<?> roles) {
-                    for (Object r : roles) {
-                        if (r instanceof String role) {
-                            mapped.add(new SimpleGrantedAuthority("ROLE_" + role));
-                        }
-                    }
-                }
-            }
+    private Collection<GrantedAuthority> extractKeycloakAuthorities(Jwt jwt) {
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        addRolesFromAccessClaim(jwt.getClaim("realm_access"), authorities);
+        addResourceRoles(jwt.getClaim("resource_access"), authorities);
+        return authorities;
+    }
 
-            // resource_access.<client>.roles
-            Object resourceAccessObj = jwt.getClaim("resource_access");
-            if (resourceAccessObj instanceof Map<?, ?> resourceAccess) {
-                for (Object accessObj : resourceAccess.values()) {
-                    if (!(accessObj instanceof Map<?, ?> access)) continue;
+    private void addResourceRoles(Object resourceAccessClaim,
+                                  Set<GrantedAuthority> authorities) {
+        if (resourceAccessClaim instanceof Map<?, ?> resourceAccess) {
+            resourceAccess.values().forEach(
+                    accessClaim -> addRolesFromAccessClaim(accessClaim, authorities));
+        }
+    }
 
-                    Object rolesObj = access.get("roles");
-                    if (!(rolesObj instanceof Collection<?> roles)) continue;
+    private void addRolesFromAccessClaim(Object accessClaim,
+                                         Set<GrantedAuthority> authorities) {
+        if (accessClaim instanceof Map<?, ?> access) {
+            addRoles(access.get("roles"), authorities);
+        }
+    }
 
-                    for (Object r : roles) {
-                        if (r instanceof String role) {
-                            mapped.add(new SimpleGrantedAuthority("ROLE_" + role));
-                        }
-                    }
-                }
-            }
-
-            return mapped;
-        };
+    private void addRoles(Object rolesClaim,
+                          Set<GrantedAuthority> authorities) {
+        if (rolesClaim instanceof Collection<?> roles) {
+            roles.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .forEach(authorities::add);
+        }
     }
 }

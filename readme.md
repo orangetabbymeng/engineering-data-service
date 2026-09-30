@@ -55,6 +55,8 @@ The ingestion flow is asynchronous:
 - Token-aware chunking with configurable overlap and per-file limits
 - Azure OpenAI embedding generation
 - PostgreSQL and pgvector persistence
+- Agent-friendly semantic-search REST API using cosine similarity
+- Optional search filters for module, module version, and deprecated content
 - Canonical-file upsert by module, version, and path
 - Asynchronous processing with a configurable thread pool
 - MDC request-context propagation into asynchronous tasks
@@ -122,6 +124,9 @@ Spring Boot REST API
         ├─ EmbeddingService
         │    └─ Azure OpenAI Embeddings API
         │
+        ├─ EmbeddingSearchController
+        │    └─ embeds queries and retrieves nearest chunks
+        │
         ├─ JPA repositories
         │    └─ PostgreSQL + pgvector
         │         ├─ engineering_reference.canonical_files
@@ -141,7 +146,7 @@ Spring Boot REST API
 - Canonical records are looked up by the null-safe tuple `(module, moduleVersion, path)` and then inserted or updated.
 - Chunk records reference their canonical file through `canonical_file_id`.
 - Re-embedding after a deprecation change runs asynchronously. The PATCH request returns before all vectors are necessarily regenerated.
-- This service creates embeddings but does not expose a vector-similarity search endpoint.
+- Semantic search embeds each query with the configured deployment and ranks stored chunks by pgvector cosine similarity.
 
 ---
 
@@ -178,6 +183,12 @@ The storage location is temporary staging space. Processing removes each local f
 - Calls the configured Azure OpenAI embedding deployment
 - Converts the provider's `List<Float>` result to `float[]`
 - Rejects blank input and fails when the provider returns no embedding data
+
+### `EmbeddingSearchController`
+
+- Exposes `POST /api/embeddings/search` for agent and application retrieval
+- Returns ranked chunks with cosine similarity scores and source metadata
+- Supports optional module, module-version, and deprecated-content filters
 
 ### `EmbeddingAdminController`
 
@@ -286,12 +297,12 @@ Recognized application roles are:
 
 | Endpoint group | Effective access |
 |---|---|
-| `/api/**` | `embedding-admin` or `assistant-admin` |
+| `POST /api/files/upload` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
+| `POST /api/embeddings/search` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
+| Other `/api/**` endpoints | `embedding-admin` or `assistant-admin` |
 | Non-API resources, including Swagger UI and OpenAPI JSON | Publicly reachable |
 
-Controller methods also declare `embedding-user`, `embedding-admin`, and `assistant-admin`. However, the current HTTP security rule for uploads is configured as `/api/upload/**`, while the actual upload endpoint is `/api/files/upload`. Consequently, the broader `/api/**` admin rule applies and an `embedding-user` token alone cannot currently reach the upload endpoint.
-
-> Swagger UI being publicly reachable does not make protected API operations public. Calling an `/api/**` endpoint still requires a valid bearer token and an effective admin role.
+> Swagger UI being publicly reachable does not make protected API operations public. Calling an `/api/**` endpoint still requires a valid bearer token and one of the roles allowed for that endpoint.
 
 CSRF is disabled because the API is stateless and bearer-token based.
 
@@ -468,6 +479,43 @@ A mixed request may contain both accepted and rejected files:
 ```
 
 The response reports request-level validation and staging results. Inspect application logs to determine whether asynchronous processing later succeeded.
+
+### Semantic embedding search
+
+An agent can use this endpoint as a retrieval tool. The service embeds the natural-language query with the same Azure OpenAI deployment used for ingestion, then returns the nearest stored chunks by cosine similarity.
+
+```http readme.md
+POST /api/embeddings/search
+Content-Type: application/json
+Authorization: Bearer <token>
+```
+
+Request fields:
+
+| Field | Required | Description |
+|---|---:|---|
+| `query` | Yes | Non-blank natural-language or code search query |
+| `limit` | No | Number of results from 1 to 50; defaults to 10 |
+| `module` | No | Exact module filter |
+| `moduleVersion` | No | Exact module-version filter |
+| `includeDeprecated` | No | Include deprecated chunks; defaults to `false` |
+
+Example:
+
+```bash readme.md
+curl --request POST 'http://localhost:8080/api/embeddings/search' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "query": "Where is payment authentication configured?",
+    "limit": 5,
+    "module": "payments"
+  }'
+```
+
+The response is a JSON array ordered from most to least similar. Each result contains `score`, `content`, `fileName`, `path`, `module`, `moduleVersion`, `fileType`, `chunkIndex`, `chunkCount`, and `deprecated`. `score` is `1 - cosine_distance`; larger values are more similar.
+
+The agent must send a Keycloak bearer token containing `embedding-user`, `embedding-admin`, or `assistant-admin`.
 
 ### Deprecate or restore a module
 
