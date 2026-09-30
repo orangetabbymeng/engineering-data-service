@@ -6,9 +6,11 @@ on:
   push:
     branches:
       - master
+      - master-beta
 
 env:
-  IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+  SERVICE_NAME: engineering-data-service
+  DEFAULT_ACR_URL: hcidplaygroundregistry.azurecr.io
 
 jobs:
   build-and-push:
@@ -31,6 +33,45 @@ jobs:
       - name: Build jar (skip tests)
         run: ./mvnw -B -Dmaven.test.skip=true package
 
+      - name: Determine image repository and tags
+        id: image
+        shell: bash
+        env:
+          CONFIGURED_ACR_URL: ${{ vars.ACR_URL }}
+        run: |
+          set -euo pipefail
+
+          ACR_URL="${CONFIGURED_ACR_URL:-$DEFAULT_ACR_URL}"
+          ACR_URL="${ACR_URL#https://}"
+          ACR_URL="${ACR_URL%/}"
+          ACR_NAME="${ACR_URL%%.*}"
+
+          BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          BRANCH="$(printf '%s' "$BRANCH" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')"
+          if [ -z "$BRANCH" ]; then
+            echo "Unable to derive a valid branch name from the GitHub ref."
+            exit 1
+          fi
+
+          VERSION="$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          if [[ ! "$VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Maven version '$VERSION' is not a valid Docker tag."
+            exit 1
+          fi
+
+          REPOSITORY="$SERVICE_NAME-$BRANCH"
+          IMAGE_NAME="$ACR_URL/$REPOSITORY"
+          echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
+          echo "acr_url=$ACR_URL" >> "$GITHUB_OUTPUT"
+          echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_sha=$VERSION-$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Using image repository $IMAGE_NAME"
+
       # ── Login to ACR (service-principal or username/password) ──────────────
       - name: Determine and perform registry login
         id: login
@@ -47,7 +88,7 @@ jobs:
               --username "$(jq -r .clientId /tmp/azure_creds.json)" \
               --password "$(jq -r .clientSecret /tmp/azure_creds.json)" \
               --tenant   "$(jq -r .tenantId   /tmp/azure_creds.json)" >/dev/null
-            az acr login --name hcidplaygroundregistry
+            az acr login --name "${{ steps.image.outputs.acr_name }}"
             echo "auth_method=sp" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ secrets.ACR_USERNAME }}" ] && [ -n "${{ secrets.ACR_PASSWORD }}" ]; then
             echo "auth_method=userpass" >> "$GITHUB_OUTPUT"
@@ -60,7 +101,7 @@ jobs:
         if: ${{ steps.login.outputs.auth_method == 'userpass' }}
         uses: docker/login-action@v2
         with:
-          registry: ${{ vars.ACR_URL }}
+          registry: ${{ steps.image.outputs.acr_url }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
@@ -69,13 +110,23 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push image to ACR
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ steps.image.outputs.image_name }}:${{ steps.image.outputs.version_sha }}
+            ${{ steps.image.outputs.image_name }}:${{ steps.image.outputs.version }}
+            ${{ steps.image.outputs.image_name }}:${{ github.sha }}
+            ${{ steps.image.outputs.image_name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Confirm image tags in ACR
+        if: ${{ always() && steps.login.outputs.auth_method == 'sp' }}
+        shell: bash
+        run: |
+          az acr repository show-tags \
+            --name "${{ steps.image.outputs.acr_name }}" \
+            --repository "${{ steps.image.outputs.repository }}" \
+            --output table || true

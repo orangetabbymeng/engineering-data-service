@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: file-ingestor-service
+    name: engineering-data-service
 
   servlet:
     multipart:
@@ -80,4 +80,4 @@ logging:
   level:
     root: ${root_log_level:INFO}
     org.hibernate.SQL: ${hibernate_log_level:INFO}
-    com.sulaksono.fileingestorservice: ${service_log_level:INFO}
+    com.sulaksono.egineeringdataservice: ${service_log_level:INFO}

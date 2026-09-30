@@ -17,7 +17,7 @@ FROM eclipse-temurin:21-jre-jammy
 ENV APP_HOME=/app
 WORKDIR ${APP_HOME}
 
-# Copy the packaged jar (e.g. file-ingestor-service-0.0.1-SNAPSHOT.jar)
+# Copy the packaged engineering-data-service jar
 COPY --from=build /workspace/target/*.jar app.jar
 COPY applicationinsights.json /app/applicationinsights.json
 
