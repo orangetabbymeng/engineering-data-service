@@ -30,9 +30,10 @@ public class EmbeddingSearchService {
                    chunk_of,
                    deprecated
               FROM engineering_reference.file_embeddings
-             WHERE (:includeDeprecated OR deprecated = false)
-               AND (:module IS NULL OR module = :module)
-               AND (:moduleVersion IS NULL OR module_version = :moduleVersion)
+             WHERE (CAST(:includeDeprecated AS boolean) OR deprecated = false)
+               AND (CAST(:module AS varchar) IS NULL OR module = CAST(:module AS varchar))
+               AND (CAST(:moduleVersion AS varchar) IS NULL
+                    OR module_version = CAST(:moduleVersion AS varchar))
              ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
              LIMIT :resultLimit
             """;
