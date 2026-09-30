@@ -2,6 +2,7 @@ package com.sulaksono.egineeringdataservice.controller;
 
 import com.sulaksono.egineeringdataservice.dto.EmbeddingSearchRequest;
 import com.sulaksono.egineeringdataservice.dto.EmbeddingSearchResult;
+import com.sulaksono.egineeringdataservice.exception.GlobalExceptionHandler;
 import com.sulaksono.egineeringdataservice.model.FileType;
 import com.sulaksono.egineeringdataservice.service.EmbeddingSearchService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(EmbeddingSearchController.class)
-@Import(EmbeddingSearchControllerTest.TestSecurityConfig.class)
+@Import({EmbeddingSearchControllerTest.TestSecurityConfig.class, GlobalExceptionHandler.class})
 class EmbeddingSearchControllerTest {
 
     @Autowired
@@ -82,6 +83,32 @@ class EmbeddingSearchControllerTest {
                 .andExpect(jsonPath("$[0].content").value("result content"));
 
         verify(searchService).search(any(EmbeddingSearchRequest.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "embedding-user")
+    void acceptsLexicalSearchMode() throws Exception {
+        when(searchService.search(any())).thenReturn(List.of());
+
+        mvc.perform(post("/api/embeddings/search")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"JwtAuthenticationConverter\",\"mode\":\"LEXICAL\"}"))
+                .andExpect(status().isOk());
+
+        verify(searchService).search(any(EmbeddingSearchRequest.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "embedding-user")
+    void rejectsUnknownSearchMode() throws Exception {
+        mvc.perform(post("/api/embeddings/search")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"authentication\",\"mode\":\"INVALID\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(searchService);
     }
 
     @Test

@@ -55,7 +55,8 @@ The ingestion flow is asynchronous:
 - Token-aware chunking with configurable overlap and per-file limits
 - Azure OpenAI embedding generation
 - PostgreSQL and pgvector persistence
-- Agent-friendly semantic-search REST API using cosine similarity
+- Agent-friendly semantic, lexical, and hybrid search API
+- PostgreSQL full-text search for exact identifiers and error messages
 - Optional search filters for module, module version, and deprecated content
 - Canonical-file upsert by module, version, and path
 - Asynchronous processing with a configurable thread pool
@@ -125,7 +126,7 @@ Spring Boot REST API
         │    └─ Azure OpenAI Embeddings API
         │
         ├─ EmbeddingSearchController
-        │    └─ embeds queries and retrieves nearest chunks
+        │    └─ performs semantic, lexical, or hybrid retrieval
         │
         ├─ JPA repositories
         │    └─ PostgreSQL + pgvector
@@ -146,7 +147,8 @@ Spring Boot REST API
 - Canonical records are looked up by the null-safe tuple `(module, moduleVersion, path)` and then inserted or updated.
 - Chunk records reference their canonical file through `canonical_file_id`.
 - Re-embedding after a deprecation change runs asynchronously. The PATCH request returns before all vectors are necessarily regenerated.
-- Semantic search embeds each query with the configured deployment and ranks stored chunks by pgvector cosine similarity.
+- Semantic search ranks chunks by pgvector cosine similarity; lexical search uses PostgreSQL full-text search.
+- Hybrid search combines semantic and lexical ranks with reciprocal-rank fusion.
 
 ---
 
@@ -187,7 +189,8 @@ The storage location is temporary staging space. Processing removes each local f
 ### `EmbeddingSearchController`
 
 - Exposes `POST /api/embeddings/search` for agent and application retrieval
-- Returns ranked chunks with cosine similarity scores and source metadata
+- Supports semantic, lexical, and hybrid retrieval modes
+- Returns ranked chunks with mode-specific scores and source metadata
 - Supports optional module, module-version, and deprecated-content filters
 
 ### `EmbeddingAdminController`
@@ -338,13 +341,13 @@ Stores one row per processed chunk, including:
 - pgvector embedding
 - Foreign key to `canonical_files`
 
-A cosine-distance pgvector index is recommended for downstream retrieval workloads. Its vector dimension must match the configured Azure OpenAI embedding deployment.
+A cosine-distance pgvector index supports semantic retrieval, and a GIN expression index on `to_tsvector('simple', coalesce(content, ''))` supports lexical retrieval. The vector dimension must match the configured Azure OpenAI embedding deployment.
 
 ### Schema bootstrap status
 
-The repository contains `src/main/resources/schema.sql`, but SQL initialization is disabled with `spring.sql.init.mode=never`. The script also references `ingestor_db` in some statements while the JPA entities and runtime configuration use `engineering_reference`, and its current statement ordering should be reviewed before execution.
+The repository contains `src/main/resources/schema.sql`, but SQL initialization is disabled with `spring.sql.init.mode=never`. For an existing database, `src/main/resources/db/migration/V1_5_2__add_lexical_search_index.sql` contains the idempotent lexical-index change.
 
-Do **not** assume that the checked-in script runs automatically or apply it unchanged to production. Provision and migrate `engineering_reference` through the environment's approved migration process, ensuring that table names, foreign keys, indexes, and vector dimensions match the deployed model.
+This project does not include or run Flyway automatically; the versioned SQL file is an artifact for the approved external migration process. Do **not** assume either script runs at application startup. Provision and migrate `engineering_reference` through the environment's approved process, ensuring that table names, foreign keys, indexes, and vector dimensions match the deployed model.
 
 Required PostgreSQL extensions typically include:
 
@@ -480,9 +483,9 @@ A mixed request may contain both accepted and rejected files:
 
 The response reports request-level validation and staging results. Inspect application logs to determine whether asynchronous processing later succeeded.
 
-### Semantic embedding search
+### Search engineering content
 
-An agent can use this endpoint as a retrieval tool. The service embeds the natural-language query with the same Azure OpenAI deployment used for ingestion, then returns the nearest stored chunks by cosine similarity.
+An agent can use this endpoint as a retrieval tool. It supports semantic vector retrieval, PostgreSQL lexical full-text retrieval, and hybrid retrieval.
 
 ```http readme.md
 POST /api/embeddings/search
@@ -499,6 +502,7 @@ Request fields:
 | `module` | No | Exact module filter |
 | `moduleVersion` | No | Exact module-version filter |
 | `includeDeprecated` | No | Include deprecated chunks; defaults to `false` |
+| `mode` | No | `SEMANTIC`, `LEXICAL`, or `HYBRID`; defaults to `SEMANTIC` |
 
 Example:
 
@@ -509,11 +513,16 @@ curl --request POST 'http://localhost:8080/api/embeddings/search' \
   --data '{
     "query": "Where is payment authentication configured?",
     "limit": 5,
-    "module": "payments"
+    "module": "payments",
+    "mode": "HYBRID"
   }'
 ```
 
-The response is a JSON array ordered from most to least similar. Each result contains `score`, `content`, `fileName`, `path`, `module`, `moduleVersion`, `fileType`, `chunkIndex`, `chunkCount`, and `deprecated`. `score` is `1 - cosine_distance`; larger values are more similar.
+The response is a JSON array ordered from highest to lowest relevance. Each result contains `score`, `content`, `fileName`, `path`, `module`, `moduleVersion`, `fileType`, `chunkIndex`, `chunkCount`, and `deprecated`.
+
+- `SEMANTIC` embeds the query and reports `1 - cosine_distance`.
+- `LEXICAL` uses `websearch_to_tsquery` with the `simple` dictionary and reports PostgreSQL text rank. It does not call Azure OpenAI.
+- `HYBRID` retrieves candidates from both modes and reports a reciprocal-rank-fusion score. Raw semantic and lexical scores are not directly averaged.
 
 The agent must send a Keycloak bearer token containing `embedding-user`, `embedding-admin`, or `assistant-admin`.
 

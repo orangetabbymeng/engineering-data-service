@@ -1,10 +1,10 @@
 /* bootstrap DDL – pgvector + metadata columns */
-create schema if not exists ingestor_db;
+create schema if not exists engineering_reference;
 
 create extension if not exists pgcrypto;
 create extension if not exists vector;
 
-create table canonical_files
+create table engineering_reference.canonical_files
 (
     id             uuid                     default gen_random_uuid() not null
         primary key,
@@ -22,12 +22,7 @@ create table canonical_files
     updated_at     timestamp with time zone default CURRENT_TIMESTAMP not null
 );
 
-create index if not exists file_embeddings_embedding_idx
-    on ingestor_db.file_embeddings
-        using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
-
-create table file_embeddings
+create table engineering_reference.file_embeddings
 (
     id                uuid                     default gen_random_uuid() not null
         primary key,
@@ -44,28 +39,35 @@ create table file_embeddings
     module_version    varchar(255),
     canonical_file_id uuid
         constraint fk_file_embeddings_canonical_file
-            references canonical_files
+            references engineering_reference.canonical_files
 );
 
-CREATE INDEX file_embeddings_embedding_idx
-    ON file_embeddings USING ivfflat (embedding vector_cosine_ops);
+create index if not exists file_embeddings_embedding_idx
+    on engineering_reference.file_embeddings
+        using ivfflat (embedding vector_cosine_ops)
+    with (lists = 100);
+
+create index if not exists file_embeddings_content_fts_idx
+    on engineering_reference.file_embeddings
+        using gin (to_tsvector('simple', coalesce(content, '')));
 
 create index ix_file_embeddings_canonical_file_id
-    on file_embeddings (canonical_file_id);
+    on engineering_reference.file_embeddings (canonical_file_id);
 
 create unique index uq_canonical_files_mod_ver_path
-    on canonical_files (module, COALESCE(module_version, ''::character varying), path);
+    on engineering_reference.canonical_files
+        (module, COALESCE(module_version, ''::character varying), path);
 
 create index ix_canonical_files_path
-    on canonical_files (path);
+    on engineering_reference.canonical_files (path);
 
 create index ix_canonical_files_module
-    on canonical_files (module);
+    on engineering_reference.canonical_files (module);
 
 create index ix_canonical_files_repo
-    on canonical_files (repo_clone_url);
+    on engineering_reference.canonical_files (repo_clone_url);
 
-create function set_updated_at() returns trigger
+create or replace function engineering_reference.set_updated_at() returns trigger
     language plpgsql
 as
 $$
@@ -75,8 +77,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_canonical_files_updated_at ON ingestor_db.canonical_files;
+drop trigger if exists trg_canonical_files_updated_at
+    on engineering_reference.canonical_files;
 
-CREATE TRIGGER trg_canonical_files_updated_at
-    BEFORE UPDATE ON ingestor_db.canonical_files
-    FOR EACH ROW EXECUTE FUNCTION ingestor_db.set_updated_at();
+create trigger trg_canonical_files_updated_at
+    before update on engineering_reference.canonical_files
+    for each row execute function engineering_reference.set_updated_at();
