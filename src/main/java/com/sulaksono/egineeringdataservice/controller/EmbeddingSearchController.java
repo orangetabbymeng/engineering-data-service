@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,7 +44,7 @@ public class EmbeddingSearchController {
     )
     @SecurityRequirement(name = "keycloak")
     @PreAuthorize("hasAnyRole('embedding-user','embedding-admin','assistant-admin')")
-    public List<EmbeddingSearchResult> search(
+    public ResponseEntity<List<EmbeddingSearchResult>> search(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     description = "Search request. Omit module filters to discover them from results.",
@@ -74,6 +76,8 @@ public class EmbeddingSearchController {
                     })
             )
             @Valid @RequestBody EmbeddingSearchRequest request) {
-        return searchService.search(request);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(searchService.search(request));
     }
 }

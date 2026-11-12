@@ -7,9 +7,13 @@ import java.util.UUID;
 
 public record EmbeddingSearchResult(
         UUID id,
+        UUID canonicalFileId,
 
         @Schema(description = "Mode-specific relevance score; compare scores only within one response.")
         double score,
+
+        @Schema(description = "Cosine distance for semantic results; null for lexical and hybrid results.")
+        Double distance,
 
         String content,
         String fileName,
@@ -28,4 +32,10 @@ public record EmbeddingSearchResult(
         int chunkCount,
         boolean deprecated
 ) {
+    public EmbeddingSearchResult(UUID id, double score, String content, String fileName, String path,
+                                 String module, String moduleVersion, FileType fileType,
+                                 int chunkIndex, int chunkCount, boolean deprecated) {
+        this(id, null, score, null, content, fileName, path, module, moduleVersion,
+                fileType, chunkIndex, chunkCount, deprecated);
+    }
 }

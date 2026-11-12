@@ -24,7 +24,7 @@ public class EmbeddingSearchService {
     private static final int HYBRID_CANDIDATE_MULTIPLIER = 3;
 
     private static final String RESULT_COLUMNS = """
-            id, content, file_name, path, module, module_version, file_type,
+            id, canonical_file_id, content, file_name, path, module, module_version, file_type,
             chunk_idx, chunk_of, deprecated
             """;
 
@@ -37,9 +37,13 @@ public class EmbeddingSearchService {
 
     private static final String SEMANTIC_SEARCH_SQL = """
             SELECT %s,
-                   1 - (embedding <=> CAST(:queryEmbedding AS vector)) AS score
+                   1 - (embedding <=> CAST(:queryEmbedding AS vector)) AS score,
+                   embedding <=> CAST(:queryEmbedding AS vector) AS distance
               FROM engineering_reference.file_embeddings
              WHERE %s
+               AND (CAST(:maxDistance AS double precision) IS NULL
+                    OR embedding <=> CAST(:queryEmbedding AS vector)
+                       <= CAST(:maxDistance AS double precision))
              ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
              LIMIT :resultLimit
             """.formatted(RESULT_COLUMNS, FILTERS);
@@ -49,7 +53,8 @@ public class EmbeddingSearchService {
                    ts_rank_cd(
                        to_tsvector('simple', coalesce(content, '')),
                        websearch_to_tsquery('simple', :query)
-                   ) AS score
+                   ) AS score,
+                   NULL::double precision AS distance
               FROM engineering_reference.file_embeddings
              WHERE %s
                AND to_tsvector('simple', coalesce(content, ''))
@@ -95,13 +100,16 @@ public class EmbeddingSearchService {
                 .addValue("includeDeprecated", request.shouldIncludeDeprecated(), Types.BOOLEAN)
                 .addValue("module", normalize(request.module()), Types.VARCHAR)
                 .addValue("moduleVersion", normalize(request.moduleVersion()), Types.VARCHAR)
+                .addValue("maxDistance", request.maxDistance(), Types.DOUBLE)
                 .addValue("resultLimit", limit, Types.INTEGER);
     }
 
     private List<EmbeddingSearchResult> executeSearch(String sql, MapSqlParameterSource parameters) {
         return jdbcTemplate.query(sql, parameters, (rs, rowNum) -> new EmbeddingSearchResult(
                 rs.getObject("id", UUID.class),
+                rs.getObject("canonical_file_id", UUID.class),
                 rs.getDouble("score"),
+                nullableDouble(rs, "distance"),
                 rs.getString("content"),
                 rs.getString("file_name"),
                 rs.getString("path"),
@@ -147,9 +155,15 @@ public class EmbeddingSearchService {
 
     private static EmbeddingSearchResult withScore(EmbeddingSearchResult result, double score) {
         return new EmbeddingSearchResult(
-                result.id(), score, result.content(), result.fileName(), result.path(),
-                result.module(), result.moduleVersion(), result.fileType(), result.chunkIndex(),
-                result.chunkCount(), result.deprecated());
+                result.id(), result.canonicalFileId(), score, null, result.content(),
+                result.fileName(), result.path(), result.module(), result.moduleVersion(),
+                result.fileType(), result.chunkIndex(), result.chunkCount(), result.deprecated());
+    }
+
+    private static Double nullableDouble(java.sql.ResultSet resultSet, String column)
+            throws java.sql.SQLException {
+        double value = resultSet.getDouble(column);
+        return resultSet.wasNull() ? null : value;
     }
 
     private static String normalize(String value) {

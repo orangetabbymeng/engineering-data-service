@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 public record EmbeddingSearchRequest(
         @Schema(description = "Natural-language question, code identifier, or error text to find.",
@@ -28,8 +29,16 @@ public record EmbeddingSearchRequest(
 
         @Schema(description = "Retrieval strategy. HYBRID is recommended for broad discovery. "
                 + "Defaults to SEMANTIC.", example = "HYBRID")
-        SearchMode mode
+        SearchMode mode,
+
+        @Schema(description = "Optional maximum cosine distance for semantic candidates.", example = "0.45")
+        @Positive Double maxDistance
 ) {
+    public EmbeddingSearchRequest(String query, Integer limit, String module, String moduleVersion,
+                                  Boolean includeDeprecated, SearchMode mode) {
+        this(query, limit, module, moduleVersion, includeDeprecated, mode, null);
+    }
+
     public int effectiveLimit() {
         return limit == null ? 10 : limit;
     }
