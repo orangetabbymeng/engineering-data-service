@@ -1,7 +1,10 @@
 package com.sulaksono.egineeringdataservice.controller;
 
+import com.sulaksono.egineeringdataservice.dto.EmbeddingIndexMaintenanceStatus;
+import com.sulaksono.egineeringdataservice.exception.EmbeddingIndexMaintenanceInProgressException;
 import com.sulaksono.egineeringdataservice.repository.CanonicalFileRepository;
 import com.sulaksono.egineeringdataservice.repository.FileEmbeddingRepository;
+import com.sulaksono.egineeringdataservice.service.EmbeddingIndexMaintenanceService;
 import com.sulaksono.egineeringdataservice.service.ReembeddingService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
@@ -21,10 +24,14 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,6 +52,9 @@ class EmbeddingAdminControllerTest {
     @MockitoBean
     private ReembeddingService reembed;
 
+    @MockitoBean
+    private EmbeddingIndexMaintenanceService indexMaintenanceService;
+
     @TestConfiguration
     @EnableWebSecurity
     @EnableMethodSecurity
@@ -54,6 +64,10 @@ class EmbeddingAdminControllerTest {
         SecurityFilterChain testSecurityFilterChain(HttpSecurity http) {
             return http
                     .authorizeHttpRequests(auth -> auth
+                            .requestMatchers(HttpMethod.POST, "/api/embeddings/index/reindex")
+                            .hasAnyRole("embedding-admin", "assistant-admin")
+                            .requestMatchers(HttpMethod.GET, "/api/embeddings/index/reindex")
+                            .hasAnyRole("embedding-admin", "assistant-admin")
                             .requestMatchers(HttpMethod.PATCH, "/api/embeddings/**")
                             .hasAnyRole("embedding-user", "embedding-admin", "assistant-admin")
                             .requestMatchers(HttpMethod.DELETE, "/api/embeddings/**")
@@ -71,6 +85,57 @@ class EmbeddingAdminControllerTest {
                     )
                     .build();
         }
+    }
+
+    @Test
+    @WithMockUser(roles = "embedding-admin")
+    void reindexReturnsAcceptedStatus() throws Exception {
+        Instant startedAt = Instant.parse("2026-11-12T10:15:30Z");
+        when(indexMaintenanceService.startReindex()).thenReturn(new EmbeddingIndexMaintenanceStatus(
+                EmbeddingIndexMaintenanceStatus.State.RUNNING,
+                startedAt,
+                null,
+                "Embedding index reindex is running"));
+
+        mvc.perform(post("/api/embeddings/index/reindex").with(csrf()))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.state").value("RUNNING"))
+                .andExpect(jsonPath("$.startedAt").value(startedAt.toString()))
+                .andExpect(jsonPath("$.completedAt").doesNotExist());
+
+        verify(indexMaintenanceService).startReindex();
+    }
+
+    @Test
+    @WithMockUser(roles = "assistant-admin")
+    void reindexStatusReturnsLatestStatus() throws Exception {
+        when(indexMaintenanceService.status()).thenReturn(EmbeddingIndexMaintenanceStatus.idle());
+
+        mvc.perform(get("/api/embeddings/index/reindex"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("IDLE"))
+                .andExpect(jsonPath("$.message").value("No reindex has been requested"));
+    }
+
+    @Test
+    @WithMockUser(roles = "embedding-admin")
+    void duplicateReindexReturnsConflict() throws Exception {
+        when(indexMaintenanceService.startReindex())
+                .thenThrow(new EmbeddingIndexMaintenanceInProgressException());
+
+        mvc.perform(post("/api/embeddings/index/reindex").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail").value("Embedding index reindex is already running"));
+    }
+
+    @Test
+    @WithMockUser(roles = "embedding-user")
+    void reindexWithNonAdminRoleReturnsForbidden() throws Exception {
+        mvc.perform(post("/api/embeddings/index/reindex").with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(indexMaintenanceService);
     }
 
     @Test

@@ -62,6 +62,7 @@ The ingestion flow is asynchronous:
 - Asynchronous processing with a configurable thread pool
 - MDC request-context propagation into asynchronous tasks
 - Module-level soft deprecation, restoration, re-embedding, and hard deletion
+- Asynchronous online pgvector index rebuild with status reporting
 - Stateless Keycloak/OIDC JWT authentication
 - Realm-role and client-role mapping to Spring Security authorities
 - OpenAPI 3 and Swagger UI with Keycloak authorization-code configuration
@@ -198,6 +199,7 @@ The storage location is temporary staging space. Processing removes each local f
 - Changes the deprecation state of all embedding chunks for a module
 - Triggers asynchronous vector regeneration so the deprecation metadata is reflected in embedding input
 - Permanently deletes a module's embeddings and canonical files
+- Starts and reports the status of an online pgvector index rebuild
 
 ### `ZipUtil`
 
@@ -587,6 +589,26 @@ Successful response:
 ```text readme.md
 deleted all rows for module: payments
 ```
+
+### Rebuild the vector index
+
+Administrators can queue an online rebuild of the pgvector index:
+
+```http readme.md
+POST /api/embeddings/index/reindex
+Authorization: Bearer <token>
+```
+
+The endpoint requires `embedding-admin` or `assistant-admin` and returns `202 Accepted` with a `RUNNING` status. Only one rebuild can run per application instance; another request while it is running returns `409 Conflict`.
+
+Query the current or most recently completed operation with:
+
+```http readme.md
+GET /api/embeddings/index/reindex
+Authorization: Bearer <token>
+```
+
+The state is `IDLE`, `RUNNING`, `SUCCEEDED`, or `FAILED`, with start/completion timestamps and a status message. The operation runs PostgreSQL `REINDEX INDEX CONCURRENTLY` outside an application transaction so reads and writes can continue. Status is held in application memory and resets when the instance restarts.
 
 ---
 
