@@ -8,7 +8,7 @@ import com.sulaksono.egineeringdataservice.service.EmbeddingSearchService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -49,7 +49,7 @@ class EmbeddingSearchControllerTest {
     @EnableMethodSecurity
     static class TestSecurityConfig {
         @Bean
-        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) {
             return http
                     .authorizeHttpRequests(auth -> auth
                             .requestMatchers("/api/embeddings/search")
@@ -106,7 +106,10 @@ class EmbeddingSearchControllerTest {
                         .with(csrf())
                         .contentType("application/json")
                         .content("{\"query\":\"authentication\",\"mode\":\"INVALID\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.detail").value("Malformed request body"));
 
         verifyNoInteractions(searchService);
     }
@@ -118,7 +121,10 @@ class EmbeddingSearchControllerTest {
                         .with(csrf())
                         .contentType("application/json")
                         .content("{\"query\":\"   \"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.detail").value("query must not be blank"));
 
         verifyNoInteractions(searchService);
     }

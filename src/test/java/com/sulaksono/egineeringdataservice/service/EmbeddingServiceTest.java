@@ -5,10 +5,10 @@ import com.azure.ai.openai.models.EmbeddingItem;
 import com.azure.ai.openai.models.Embeddings;
 import com.azure.ai.openai.models.EmbeddingsOptions;
 import com.sulaksono.egineeringdataservice.config.AzureOpenAIProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,22 +29,24 @@ class EmbeddingServiceTest {
     private OpenAIClient client;
 
     @Mock
-    private AzureOpenAIProperties props;
-
-    @Mock
     private Embeddings embeddings;
 
     @Mock
     private EmbeddingItem embeddingItem;
 
-    @InjectMocks
     private EmbeddingService service;
+
+    @BeforeEach
+    void setUp() {
+        AzureOpenAIProperties props = new AzureOpenAIProperties(
+                "https://fake-instance.openai.azure.com/",
+                "fake-api-key",
+                DEPLOYMENT_NAME);
+        service = new EmbeddingService(client, props);
+    }
 
     @Test
     void generateEmbedding_returnsVector() {
-        when(props.getEmbeddingModelDeployment())
-                .thenReturn(DEPLOYMENT_NAME);
-
         when(client.getEmbeddings(any(), any()))
                 .thenReturn(embeddings);
 
@@ -67,9 +69,6 @@ class EmbeddingServiceTest {
 
     @Test
     void generateEmbedding_passesInputToAzure() {
-        when(props.getEmbeddingModelDeployment())
-                .thenReturn(DEPLOYMENT_NAME);
-
         when(client.getEmbeddings(any(), any()))
                 .thenReturn(embeddings);
 
@@ -99,7 +98,7 @@ class EmbeddingServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("input");
 
-        verifyNoInteractions(client, props);
+        verifyNoInteractions(client);
     }
 
     @Test
@@ -108,14 +107,11 @@ class EmbeddingServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("input");
 
-        verifyNoInteractions(client, props);
+        verifyNoInteractions(client);
     }
 
     @Test
     void generateEmbedding_noEmbeddingReturned_throwsException() {
-        when(props.getEmbeddingModelDeployment())
-                .thenReturn(DEPLOYMENT_NAME);
-
         when(client.getEmbeddings(any(), any()))
                 .thenReturn(embeddings);
 
@@ -134,9 +130,6 @@ class EmbeddingServiceTest {
 
     @Test
     void generateEmbedding_nullEmbeddingData_throwsException() {
-        when(props.getEmbeddingModelDeployment())
-                .thenReturn(DEPLOYMENT_NAME);
-
         when(client.getEmbeddings(any(), any()))
                 .thenReturn(embeddings);
 
@@ -156,9 +149,6 @@ class EmbeddingServiceTest {
     @Test
     void generateEmbedding_clientThrows_propagatesException() {
         RuntimeException ex = new RuntimeException("azure failure");
-
-        when(props.getEmbeddingModelDeployment())
-                .thenReturn(DEPLOYMENT_NAME);
 
         when(client.getEmbeddings(any(), any()))
                 .thenThrow(ex);

@@ -1,27 +1,24 @@
 package com.sulaksono.egineeringdataservice.config;
 
 import jakarta.validation.constraints.Min;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
-@Getter
-@Setter
+/**
+ * Vector chunking configuration.
+ *
+ * @param includePathDepth how many path segments from the right to include in the header;
+ *                         {@code 0} includes only the file name
+ * @param chunkSizeTokens chunk window size in tokens
+ * @param chunkOverlapTokens overlap between adjacent chunks in tokens
+ * @param maxChunksPerFile maximum chunks generated per file; {@code 0} means unlimited
+ */
 @Validated
 @ConfigurationProperties(prefix = "vector")
-public class VectorProperties {
-
-    /**
-     * How many path segments (from the right) to include in the header.
-     * 0 ➜ file name only.
-     */
-    @Min(0)
-    private int includePathDepth = 0;
-
-    private int chunkSizeTokens    = 800;   // window size
-    private int chunkOverlapTokens = 100;   // overlap
-
-    @Min(0)
-    private int maxChunksPerFile = 0;
+public record VectorProperties(
+        @Min(0) @DefaultValue("0") int includePathDepth,
+        @DefaultValue("800") int chunkSizeTokens,
+        @DefaultValue("100") int chunkOverlapTokens,
+        @Min(0) @DefaultValue("0") int maxChunksPerFile) {
 }

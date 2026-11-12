@@ -92,15 +92,15 @@ public class ProcessingService {
 
             List<String> chunks = splitIntoChunks(
                     rawText,
-                    vecProps.getChunkSizeTokens(),
-                    vecProps.getChunkOverlapTokens()
+                    vecProps.chunkSizeTokens(),
+                    vecProps.chunkOverlapTokens()
             );
 
             chunks = applyMaxChunksLimit(
                     requestId,
                     trimmedPath,
                     chunks,
-                    vecProps.getMaxChunksPerFile()
+                    vecProps.maxChunksPerFile()
             );
 
             log.debug(
@@ -108,8 +108,8 @@ public class ProcessingService {
                     requestId,
                     filePath,
                     chunks.size(),
-                    vecProps.getChunkSizeTokens(),
-                    vecProps.getChunkOverlapTokens()
+                    vecProps.chunkSizeTokens(),
+                    vecProps.chunkOverlapTokens()
             );
 
             FileEmbedding.Details details = new FileEmbedding.Details(
@@ -158,7 +158,7 @@ public class ProcessingService {
             relative = filePath.getFileName();
         }
 
-        return trimDepth(relative.normalize(), vecProps.getIncludePathDepth());
+        return trimDepth(relative.normalize(), vecProps.includePathDepth());
     }
 
     private CanonicalFile upsertCanonicalFile(String requestId, CanonicalFileData data) {

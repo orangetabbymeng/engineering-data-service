@@ -27,7 +27,7 @@ public class FileStorageService {
 
     public FileStorageService(StorageProperties props) {
         this.rootDir =
-                Paths.get(props.getLocation())
+                Paths.get(props.location())
                         .toAbsolutePath()
                         .normalize();
 

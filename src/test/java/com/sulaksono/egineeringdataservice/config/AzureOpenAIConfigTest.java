@@ -19,16 +19,12 @@ class AzureOpenAIConfigTest {
 
     @Test
     void httpClientBean_shouldBeRegistered() {
-        contextRunner.run(context -> {
-            assertThat(context).hasSingleBean(HttpClient.class);
-        });
+        contextRunner.run(context -> assertThat(context).hasSingleBean(HttpClient.class));
     }
 
     @Test
     void openAIClientBean_shouldBeRegistered() {
-        contextRunner.run(context -> {
-            assertThat(context).hasSingleBean(OpenAIClient.class);
-        });
+        contextRunner.run(context -> assertThat(context).hasSingleBean(OpenAIClient.class));
     }
 
     @Test
@@ -37,13 +33,13 @@ class AzureOpenAIConfigTest {
             AzureOpenAIProperties props =
                     context.getBean(AzureOpenAIProperties.class);
 
-            assertThat(props.getEndpoint())
+            assertThat(props.endpoint())
                     .isEqualTo("https://fake-instance.openai.azure.com/");
 
-            assertThat(props.getApiKey())
+            assertThat(props.apiKey())
                     .isEqualTo("fake-api-key");
 
-            assertThat(props.getEmbeddingModelDeployment())
+            assertThat(props.embeddingModelDeployment())
                     .isEqualTo("text-embedding-3-large");
         });
     }
@@ -59,15 +55,26 @@ class AzureOpenAIConfigTest {
     }
 
     @Test
+    void normalizesOpenAICompatibleV1EndpointForAzureSdk() {
+        assertThat(AzureOpenAIConfig.normalizeEndpoint(
+                "https://hcid-pg-eastus2-foundry.openai.azure.com/openai/v1"))
+                .isEqualTo("https://hcid-pg-eastus2-foundry.openai.azure.com/");
+    }
+
+    @Test
+    void preservesAzureResourceRootEndpoint() {
+        assertThat(AzureOpenAIConfig.normalizeEndpoint(
+                "https://hcid-pg-eastus2-foundry.openai.azure.com/"))
+                .isEqualTo("https://hcid-pg-eastus2-foundry.openai.azure.com/");
+    }
+
+    @Test
     void whenEndpointMissing_shouldFailContextStartup() {
         new ApplicationContextRunner()
                 .withUserConfiguration(AzureOpenAIConfig.class)
                 .withPropertyValues(
                         "azure.openai.api-key=fake-api-key"
                 )
-                .run(context -> {
-                    assertThat(context)
-                            .hasFailed();
-                });
+                .run(context -> assertThat(context).hasFailed());
     }
 }

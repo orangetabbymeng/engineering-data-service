@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ZipGradleUtilTest {
 
     @Test
-    void extractRootProjectName_fromSettingsGradle_shouldReturnName() throws Exception {
+    void extractRootProjectName_fromSettingsGradle_shouldReturnName() throws IOException {
         byte[] zip = zipWithEntry(
                 "settings.gradle",
                 "rootProject.name = 'demo-service'"
@@ -28,7 +29,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractRootProjectName_fromSettingsGradleKts_shouldReturnName() throws Exception {
+    void extractRootProjectName_fromSettingsGradleKts_shouldReturnName() throws IOException {
         byte[] zip = zipWithEntry(
                 "settings.gradle.kts",
                 "rootProject.name = \"demo-kts-service\""
@@ -42,7 +43,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractRootProjectName_fromNestedSettingsGradle_shouldReturnName() throws Exception {
+    void extractRootProjectName_fromNestedSettingsGradle_shouldReturnName() throws IOException {
         byte[] zip = zipWithEntry(
                 "project/subproject/settings.gradle",
                 "rootProject.name = 'nested-service'"
@@ -56,7 +57,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_fromBuildGradleEqualsSyntax_shouldReturnVersion() throws Exception {
+    void extractVersion_fromBuildGradleEqualsSyntax_shouldReturnVersion() throws IOException {
         byte[] zip = zipWithEntry(
                 "build.gradle",
                 "version = '1.2.3'"
@@ -70,7 +71,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_fromBuildGradleKtsEqualsSyntax_shouldReturnVersion() throws Exception {
+    void extractVersion_fromBuildGradleKtsEqualsSyntax_shouldReturnVersion() throws IOException {
         byte[] zip = zipWithEntry(
                 "build.gradle.kts",
                 "version = \"2.0.0\""
@@ -84,7 +85,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_fromGroovyVersionSyntax_shouldReturnVersion() throws Exception {
+    void extractVersion_fromGroovyVersionSyntax_shouldReturnVersion() throws IOException {
         byte[] zip = zipWithEntry(
                 "build.gradle",
                 "version '3.1.4'"
@@ -98,7 +99,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_whenBothSyntaxesExist_shouldPreferEqualsSyntax() throws Exception {
+    void extractVersion_whenBothSyntaxesExist_shouldPreferEqualsSyntax() throws IOException {
         byte[] zip = zipWithEntry(
                 "build.gradle",
                 """
@@ -115,7 +116,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_fromNestedBuildGradle_shouldReturnVersion() throws Exception {
+    void extractVersion_fromNestedBuildGradle_shouldReturnVersion() throws IOException {
         byte[] zip = zipWithEntry(
                 "demo/build.gradle",
                 "version = '5.0.0'"
@@ -129,7 +130,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractRootProjectName_whenSettingsGradleHasNoName_shouldReturnNull() throws Exception {
+    void extractRootProjectName_whenSettingsGradleHasNoName_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry(
                 "settings.gradle",
                 "pluginManagement { repositories { gradlePluginPortal() } }"
@@ -143,7 +144,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_whenBuildGradleHasNoVersion_shouldReturnNull() throws Exception {
+    void extractVersion_whenBuildGradleHasNoVersion_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry(
                 "build.gradle",
                 "plugins { id 'java' }"
@@ -157,7 +158,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractRootProjectName_whenNoGradleSettingsFile_shouldReturnNull() throws Exception {
+    void extractRootProjectName_whenNoGradleSettingsFile_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry(
                 "README.md",
                 "# demo"
@@ -171,7 +172,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void extractVersion_whenNoGradleBuildFile_shouldReturnNull() throws Exception {
+    void extractVersion_whenNoGradleBuildFile_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry(
                 "README.md",
                 "# demo"
@@ -210,7 +211,7 @@ class ZipGradleUtilTest {
     }
 
     @Test
-    void constructor_shouldBePrivate() throws Exception {
+    void constructor_shouldBePrivate() throws ReflectiveOperationException {
         Constructor<ZipGradleUtil> constructor =
                 ZipGradleUtil.class.getDeclaredConstructor();
 
@@ -222,7 +223,7 @@ class ZipGradleUtilTest {
         assertThat(instance).isNotNull();
     }
 
-    static byte[] zipWithEntry(String entryName, String content) throws Exception {
+    static byte[] zipWithEntry(String entryName, String content) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {

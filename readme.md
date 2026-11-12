@@ -242,7 +242,7 @@ The application uses the following environment variables directly:
 | `pg_db_url` | PostgreSQL JDBC URL | Required |
 | `pg_db_user` | PostgreSQL username | Required |
 | `pg_db_pass` | PostgreSQL password | Required |
-| `oai_api_endpoint` | Azure OpenAI endpoint | Required |
+| `oai_api_endpoint` | Azure OpenAI resource root or `/openai/v1` endpoint; the v1 suffix is normalized for the Azure SDK | Required |
 | `oai_api_key` | Azure OpenAI API key | Required |
 | `oai_embedding_model_deployment` | Azure OpenAI embedding deployment name | Required |
 | `keycloak_issuer_uri` | JWT issuer URI | Optional; falls back to `engineering_assistant_issuer_uri`, then the configured non-production URI |
@@ -371,7 +371,7 @@ Set the required database and Azure OpenAI values, plus an issuer URI when the c
 export pg_db_url='jdbc:postgresql://localhost:5432/engineering'
 export pg_db_user='engineering_user'
 export pg_db_pass='<database-password>'
-export oai_api_endpoint='https://<resource>.openai.azure.com/'
+export oai_api_endpoint='https://<resource>.openai.azure.com/openai/v1'
 export oai_api_key='<azure-openai-key>'
 export oai_embedding_model_deployment='<embedding-deployment>'
 export keycloak_issuer_uri='https://<keycloak-host>/realms/<realm>'

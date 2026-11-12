@@ -11,6 +11,7 @@ import com.sulaksono.egineeringdataservice.service.EmbeddingService;
 import com.sulaksono.egineeringdataservice.service.LiteralEmbeddingSearchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,21 +41,21 @@ public class EngineeringKnowledgeController {
 
     @PostMapping("/embeddings/generate")
     public ResponseEntity<EmbeddingGenerationResult> generate(
-            @Valid @RequestBody EmbeddingGenerationRequest request) {
+            @Valid @RequestBody @NonNull EmbeddingGenerationRequest request) {
         float[] vector = embeddingService.generateEmbedding(request.text().trim());
         return noStore(new EmbeddingGenerationResult(
-                "ok", EMBEDDING_PROVENANCE, openAIProperties.getEmbeddingModelDeployment(),
+                "ok", EMBEDDING_PROVENANCE, openAIProperties.embeddingModelDeployment(),
                 vector.length, vector, EMBEDDING_DISCLOSURE));
     }
 
     @PostMapping("/embeddings/literal-search")
     public ResponseEntity<List<EmbeddingSearchResult>> literalSearch(
-            @Valid @RequestBody LiteralSearchRequest request) {
+            @Valid @RequestBody @NonNull LiteralSearchRequest request) {
         return noStore(literalSearchService.search(request));
     }
 
     @GetMapping("/canonical-files/{id}")
-    public ResponseEntity<CanonicalFileResult> canonicalFile(@PathVariable UUID id) {
+    public ResponseEntity<CanonicalFileResult> canonicalFile(@PathVariable @NonNull UUID id) {
         return canonicalFileRepository.findById(id)
                 .map(CanonicalFileResult::from)
                 .map(EngineeringKnowledgeController::noStore)
@@ -62,7 +63,7 @@ public class EngineeringKnowledgeController {
                         .cacheControl(CacheControl.noStore()).build());
     }
 
-    private static <T> ResponseEntity<T> noStore(T body) {
+    private static <T> ResponseEntity<T> noStore(@NonNull T body) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
     }
 }

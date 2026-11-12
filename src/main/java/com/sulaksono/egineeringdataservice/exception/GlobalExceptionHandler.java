@@ -2,12 +2,14 @@ package com.sulaksono.egineeringdataservice.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -15,61 +17,51 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 /**
  * Centralised REST‐error handling.
  */
-@ControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /* ---------------------------------------------------------------
-       1. File too large
-       ------------------------------------------------------------- */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ErrorBody> handleMaxSize() {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(new ErrorBody("File too large – limit is 10 MB"));
+    public ProblemDetail handleMaxSize() {
+        return problem(HttpStatus.CONTENT_TOO_LARGE, "File too large – limit is 10 MB");
     }
 
-    /* ---------------------------------------------------------------
-       2. Missing multipart part
-       ------------------------------------------------------------- */
     @ExceptionHandler(MissingServletRequestPartException.class)
-    public ResponseEntity<ErrorBody> handleMissingPart(MissingServletRequestPartException ex) {
-        return ResponseEntity.badRequest()
-                .body(new ErrorBody("Required part '" + ex.getRequestPartName() + "' is missing"));
+    public ProblemDetail handleMissingPart(MissingServletRequestPartException ex) {
+        return problem(HttpStatus.BAD_REQUEST,
+                "Required part '" + ex.getRequestPartName() + "' is missing");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorBody> handleValidation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
+    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+        String detail = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getField() + " " + error.getDefaultMessage())
                 .orElse("Invalid request");
-        return ResponseEntity.badRequest().body(new ErrorBody(message));
+        return problem(HttpStatus.BAD_REQUEST, detail);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorBody> handleUnreadableMessage() {
-        return ResponseEntity.badRequest().body(new ErrorBody("Malformed request body"));
+    public ProblemDetail handleUnreadableMessage() {
+        return problem(HttpStatus.BAD_REQUEST, "Malformed request body");
     }
 
-    /* ---------------------------------------------------------------
-       3. Static resource not found (favicon, root, etc.) → 404
-       ------------------------------------------------------------- */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Void> handleNoResource(NoResourceFoundException ex) {
         log.debug("Static resource not found: {}", ex.getResourcePath());
         return ResponseEntity.notFound().build();
     }
 
-    /* ---------------------------------------------------------------
-       4. Fallback – unexpected controller exceptions
-       ------------------------------------------------------------- */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorBody> handleGeneric(Exception ex) {
+    public ProblemDetail handleGeneric(Exception ex) {
         log.error("Unhandled controller exception", ex);
-        return ResponseEntity.internalServerError()
-                .body(new ErrorBody("Internal error"));
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error");
     }
 
-    public record ErrorBody(String message) { }
+    private ProblemDetail problem(@NonNull HttpStatus status, @NonNull String detail) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setTitle(status.getReasonPhrase());
+        return problem;
+    }
 }

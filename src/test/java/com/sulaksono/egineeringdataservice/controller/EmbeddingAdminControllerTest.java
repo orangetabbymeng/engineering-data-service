@@ -6,7 +6,7 @@ import com.sulaksono.egineeringdataservice.service.ReembeddingService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -26,6 +26,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(EmbeddingAdminController.class)
@@ -50,7 +51,7 @@ class EmbeddingAdminControllerTest {
     static class TestSecurityConfig {
 
         @Bean
-        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) {
             return http
                     .authorizeHttpRequests(auth -> auth
                             .requestMatchers(HttpMethod.PATCH, "/api/embeddings/**")
@@ -187,7 +188,10 @@ class EmbeddingAdminControllerTest {
                                 .param("deprecated", "true")
                                 .with(csrf())
                 )
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.title").value("Internal Server Error"))
+                .andExpect(jsonPath("$.detail").value("Internal error"));
 
         verify(reembed, never()).reembedModule(any());
     }

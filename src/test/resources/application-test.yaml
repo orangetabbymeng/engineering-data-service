@@ -11,3 +11,9 @@ spring:
   sql:
     init:
       mode: never
+azure:
+  openai:
+    endpoint: https://fake-instance.openai.azure.com/openai/v1
+    # noinspection Secrets -- deterministic fake value used only by tests
+    api-key: fake-api-key
+    embedding-model-deployment: fake-embedding-deployment
