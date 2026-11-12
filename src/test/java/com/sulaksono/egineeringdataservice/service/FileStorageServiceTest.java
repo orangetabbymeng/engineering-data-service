@@ -21,17 +21,16 @@ class FileStorageServiceTest {
     private FileStorageService service;
 
     @BeforeEach
-    void setup() throws Exception {
+    void setup() throws IOException {
 
-        StorageProperties props = new StorageProperties();
-        props.setLocation(tempDir.toString());
+        StorageProperties props = new StorageProperties(tempDir.toString());
 
         service = new FileStorageService(props);
         service.init();
     }
 
     @Test
-    void save_shouldStoreFile() throws Exception {
+    void save_shouldStoreFile() throws IOException {
 
         MockMultipartFile file =
                 new MockMultipartFile(
@@ -48,7 +47,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    void save_shouldPreserveExtension() throws Exception {
+    void save_shouldPreserveExtension() throws IOException {
 
         MockMultipartFile file =
                 new MockMultipartFile(
@@ -64,7 +63,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    void save_shouldGenerateUniqueFileNames() throws Exception {
+    void save_shouldGenerateUniqueFileNames() throws IOException {
 
         MockMultipartFile file =
                 new MockMultipartFile(
@@ -83,7 +82,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    void save_fileWithoutExtension_shouldStillStore() throws Exception {
+    void save_fileWithoutExtension_shouldStillStore() throws IOException {
 
         MockMultipartFile file =
                 new MockMultipartFile(

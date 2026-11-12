@@ -27,7 +27,7 @@ class ZipUtilTest {
     // -----------------------------------------------------------------
 
     @Test
-    void unzip_pathVariant_shouldExtractSupportedFiles() throws Exception {
+    void unzip_pathVariant_shouldExtractSupportedFiles() throws IOException {
         Path zip = zipInTempDir("archive.zip", entries -> {
             entries.add(entry("Demo.java", "class Demo {}"));
             entries.add(entry("Notes.txt", "some notes"));
@@ -43,7 +43,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldSkipUnsupportedFileTypes() throws Exception {
+    void unzip_pathVariant_shouldSkipUnsupportedFileTypes() throws IOException {
         Path zip = zipInTempDir("archive.zip", entries -> {
             entries.add(entry("Demo.java", "class Demo {}"));
             entries.add(entry("photo.xyz", "binary-ish content"));
@@ -60,9 +60,9 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldIgnoreDirectoryEntries() throws Exception {
+    void unzip_pathVariant_shouldIgnoreDirectoryEntries() throws IOException {
         Path zip = zipInTempDir("archive.zip", entries -> {
-            entries.add(directoryEntry("src/"));
+            entries.add(sourceDirectoryEntry());
             entries.add(entry("src/Demo.java", "class Demo {}"));
         });
 
@@ -77,10 +77,9 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldRejectZipSlipEntries() throws Exception {
-        Path zip = zipInTempDir("evil.zip", entries -> {
-            entries.add(entry("../../evil.java", "class Evil {}"));
-        });
+    void unzip_pathVariant_shouldRejectZipSlipEntries() throws IOException {
+        Path zip = zipInTempDir("evil.zip",
+                entries -> entries.add(entry("../../evil.java", "class Evil {}")));
 
         Path extractDir = Files.createDirectory(tempDir.resolve("out"));
 
@@ -90,7 +89,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldSkipEntriesLargerThanMaxEntryBytes() throws Exception {
+    void unzip_pathVariant_shouldSkipEntriesLargerThanMaxEntryBytes() throws IOException {
         long maxEntryBytes = 10;
         long maxTotalBytes = 1024;
         int maxEntries = 100;
@@ -120,7 +119,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldStopWhenMaxEntriesReached() throws Exception {
+    void unzip_pathVariant_shouldStopWhenMaxEntriesReached() throws IOException {
         long maxEntryBytes = 1024;
         long maxTotalBytes = 1024 * 1024;
         int maxEntries = 2;
@@ -147,7 +146,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldStopWhenMaxTotalBytesReached() throws Exception {
+    void unzip_pathVariant_shouldStopWhenMaxTotalBytesReached() throws IOException {
         long maxEntryBytes = 1024;
         long maxTotalBytes = 20;
         int maxEntries = 100;
@@ -180,14 +179,13 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_whenSkipUnsupportedFalse_shouldExtractUnknownTypes() throws Exception {
+    void unzip_pathVariant_whenSkipUnsupportedFalse_shouldExtractUnknownTypes() throws IOException {
         long maxEntryBytes = 1024;
         long maxTotalBytes = 1024 * 1024;
         int maxEntries = 100;
 
-        Path zip = zipInTempDir("archive.zip", entries -> {
-            entries.add(entry("photo.xyz", "unknown-type-content"));
-        });
+        Path zip = zipInTempDir("archive.zip",
+                entries -> entries.add(entry("photo.xyz", "unknown-type-content")));
 
         Path extractDir = Files.createDirectory(tempDir.resolve("out"));
 
@@ -207,7 +205,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_pathVariant_shouldPreserveFileContent() throws Exception {
+    void unzip_pathVariant_shouldPreserveFileContent() throws IOException {
         String original = "public class Demo { }";
 
         Path zip = zipInTempDir("archive.zip", entries -> {
@@ -220,7 +218,7 @@ class ZipUtilTest {
 
         assertThat(extracted).hasSize(1);
 
-        String actual = Files.readString(extracted.get(0));
+        String actual = Files.readString(extracted.getFirst());
 
         assertThat(actual).isEqualTo(original);
     }
@@ -230,7 +228,7 @@ class ZipUtilTest {
     // -----------------------------------------------------------------
 
     @Test
-    void unzip_multipartVariant_shouldExtractSupportedFiles() throws Exception {
+    void unzip_multipartVariant_shouldExtractSupportedFiles() throws IOException {
         byte[] zipBytes = zipBytes(entries -> {
             entries.add(entry("Demo.java", "class Demo {}"));
             entries.add(entry("Other.txt", "hello"));
@@ -254,7 +252,7 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_multipartVariant_shouldSkipUnsupportedTypes() throws Exception {
+    void unzip_multipartVariant_shouldSkipUnsupportedTypes() throws IOException {
         byte[] zipBytes = zipBytes(entries -> {
             entries.add(entry("Demo.java", "class Demo {}"));
             entries.add(entry("weird.xyz", "unknown"));
@@ -278,10 +276,9 @@ class ZipUtilTest {
     }
 
     @Test
-    void unzip_multipartVariant_shouldRejectZipSlip() throws Exception {
-        byte[] zipBytes = zipBytes(entries -> {
-            entries.add(entry("../../evil.java", "class Evil {}"));
-        });
+    void unzip_multipartVariant_shouldRejectZipSlip() throws IOException {
+        byte[] zipBytes = zipBytes(
+                entries -> entries.add(entry("../../evil.java", "class Evil {}")));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -302,7 +299,7 @@ class ZipUtilTest {
     // -----------------------------------------------------------------
 
     @Test
-    void constructor_shouldBePrivate() throws Exception {
+    void constructor_shouldBePrivate() throws ReflectiveOperationException {
         Constructor<ZipUtil> constructor =
                 ZipUtil.class.getDeclaredConstructor();
 
@@ -334,9 +331,8 @@ class ZipUtilTest {
         );
     }
 
-    private static ZipEntrySpec directoryEntry(String name) {
-        String normalized = name.endsWith("/") ? name : name + "/";
-        return new ZipEntrySpec(normalized, true, new byte[0]);
+    private static ZipEntrySpec sourceDirectoryEntry() {
+        return new ZipEntrySpec("src/", true, new byte[0]);
     }
 
     private Path zipInTempDir(String zipFileName, EntryBuilder builder) throws IOException {

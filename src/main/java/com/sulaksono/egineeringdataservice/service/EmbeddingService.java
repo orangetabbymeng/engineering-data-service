@@ -42,7 +42,7 @@ public class EmbeddingService {
                 input.length());
 
         Embeddings response = client.getEmbeddings(
-                props.getEmbeddingModelDeployment(),
+                props.embeddingModelDeployment(),
                 new EmbeddingsOptions(List.of(input))
         );
 

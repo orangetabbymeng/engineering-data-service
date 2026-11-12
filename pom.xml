@@ -5,12 +5,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>4.0.9</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.sulaksono</groupId>
     <artifactId>engineering-data-service</artifactId>
-    <version>1.5.2-SNAPSHOT</version>
+    <version>2.0.0-SB4</version>
     <name>engineering-data-service</name>
     <description>engineering-data-service</description>
     <url/>
@@ -36,8 +36,10 @@
         <pgvector.version>0.1.6</pgvector.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <commons-io.version>2.20.0</commons-io.version>
-        <springdoc.version>2.8.13</springdoc.version>
+        <springdoc.version>3.2.0</springdoc.version>
         <appinsight.version>3.7.6</appinsight.version>
+        <azure-core.version>1.61.0</azure-core.version>
+        <azure-core-http-okhttp.version>1.14.0</azure-core-http-okhttp.version>
     </properties>
     <dependencies>
         <!-- Spring Boot -->
@@ -99,11 +101,16 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.azure/azure-core-http-okhttp -->
+        <!-- Keep Azure Core and its HTTP transport binary-compatible. -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-core</artifactId>
+            <version>${azure-core.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-core-http-okhttp</artifactId>
-            <version>1.13.2</version>
+            <version>${azure-core-http-okhttp.version}</version>
         </dependency>
 
         <dependency>
@@ -112,7 +119,7 @@
             <version>${appinsight.version}</version>
         </dependency>
 
-        <!-- OpenAPI / Swagger UI for Spring Boot 3 -->
+        <!-- OpenAPI / Swagger UI for Spring Boot 4 -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -145,8 +152,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -164,13 +176,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>1.18.30</version>
-                        </path>
-                    </annotationProcessorPaths>
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <plugin>

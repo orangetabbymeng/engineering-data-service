@@ -29,11 +29,22 @@ public class AzureOpenAIConfig {
             HttpClient okHttpClient) {
 
         return new OpenAIClientBuilder()
-                .endpoint(props.getEndpoint())
-                .credential(new AzureKeyCredential(props.getApiKey()))
+                .endpoint(normalizeEndpoint(props.endpoint()))
+                .credential(new AzureKeyCredential(props.apiKey()))
                 .httpClient(okHttpClient)
                 .buildClient();
     }
 
-
+    static String normalizeEndpoint(String configuredEndpoint) {
+        String endpoint = configuredEndpoint.trim();
+        String suffix = "/openai/v1";
+        int suffixStart = endpoint.endsWith("/")
+                ? endpoint.length() - suffix.length() - 1
+                : endpoint.length() - suffix.length();
+        if (suffixStart >= 0
+                && endpoint.regionMatches(true, suffixStart, suffix, 0, suffix.length())) {
+            return endpoint.substring(0, suffixStart) + "/";
+        }
+        return endpoint;
+    }
 }

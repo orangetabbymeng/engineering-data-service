@@ -1,5 +1,7 @@
 package com.sulaksono.egineeringdataservice.util;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +30,7 @@ public final class ZipGradleUtil {
     private ZipGradleUtil() {
     }
 
-    public static String extractRootProjectName(InputStream zipStream) {
+    public static @Nullable String extractRootProjectName(@Nullable InputStream zipStream) {
         return extractFromEntry(
                 zipStream,
                 entryBase -> entryBase.equals("settings.gradle")
@@ -37,7 +39,7 @@ public final class ZipGradleUtil {
         );
     }
 
-    public static String extractVersion(InputStream zipStream) {
+    public static @Nullable String extractVersion(@Nullable InputStream zipStream) {
         return extractFromEntry(
                 zipStream,
                 entryBase -> entryBase.equals("build.gradle")
@@ -54,11 +56,11 @@ public final class ZipGradleUtil {
     }
 
     private interface ContentMapper {
-        String map(String content);
+        @Nullable String map(String content);
     }
 
-    private static String extractFromEntry(
-            InputStream zipStream,
+    private static @Nullable String extractFromEntry(
+            @Nullable InputStream zipStream,
             EntryNamePredicate predicate,
             ContentMapper mapper) {
 
@@ -83,7 +85,7 @@ public final class ZipGradleUtil {
         return null;
     }
 
-    private static String readMatchingEntry(ZipInputStream input, ZipEntry entry,
+    private static @Nullable String readMatchingEntry(ZipInputStream input, ZipEntry entry,
                                             EntryNamePredicate predicate,
                                             ContentMapper mapper) throws IOException {
         if (entry.isDirectory() || !predicate.test(baseName(entry.getName()))) {
@@ -92,7 +94,7 @@ public final class ZipGradleUtil {
         return mapper.map(readEntryAsString(input, MAX_ENTRY_BYTES));
     }
 
-    private static String baseName(String entryName) {
+    private static String baseName(@Nullable String entryName) {
         if (entryName == null || entryName.isBlank()) {
             return "";
         }
@@ -121,7 +123,7 @@ public final class ZipGradleUtil {
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    private static String firstMatch(Pattern pattern, String content) {
+    private static @Nullable String firstMatch(Pattern pattern, @Nullable String content) {
         if (content == null) {
             return null;
         }
@@ -131,7 +133,8 @@ public final class ZipGradleUtil {
         return matcher.find() ? matcher.group(1) : null;
     }
 
-    private static String firstNonBlank(String first, String second) {
+    private static @Nullable String firstNonBlank(
+            @Nullable String first, @Nullable String second) {
         return first != null && !first.isBlank() ? first : second;
     }
 }

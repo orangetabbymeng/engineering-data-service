@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
@@ -20,7 +21,7 @@ class ZipPomUtilTest {
     @ParameterizedTest
     @MethodSource("artifactIdCases")
     void extractArtifactId_shouldReturnExpectedValue(
-            String entryName, String pom, String expected) throws Exception {
+            String entryName, String pom, String expected) throws IOException {
         byte[] zip = zipWithEntry(entryName, pom);
         String result = ZipPomUtil.extractArtifactId(new ByteArrayInputStream(zip));
         assertThat(result).isEqualTo(expected);
@@ -28,7 +29,7 @@ class ZipPomUtilTest {
 
     @ParameterizedTest
     @MethodSource("versionCases")
-    void extractVersion_shouldReturnExpectedValue(String pom, String expected) throws Exception {
+    void extractVersion_shouldReturnExpectedValue(String pom, String expected) throws IOException {
         byte[] zip = zipWithEntry("pom.xml", pom);
         String result = ZipPomUtil.extractVersion(new ByteArrayInputStream(zip));
         assertThat(result).isEqualTo(expected);
@@ -77,7 +78,7 @@ class ZipPomUtilTest {
     }
 
     @Test
-    void extractArtifactId_whenNoPomInZip_shouldReturnNull() throws Exception {
+    void extractArtifactId_whenNoPomInZip_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry("README.md", "# demo");
 
         String result = ZipPomUtil.extractArtifactId(
@@ -88,7 +89,7 @@ class ZipPomUtilTest {
     }
 
     @Test
-    void extractVersion_whenNoPomInZip_shouldReturnNull() throws Exception {
+    void extractVersion_whenNoPomInZip_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry("README.md", "# demo");
 
         String result = ZipPomUtil.extractVersion(
@@ -99,7 +100,7 @@ class ZipPomUtilTest {
     }
 
     @Test
-    void extractArtifactId_whenPomXmlIsMalformed_shouldReturnNull() throws Exception {
+    void extractArtifactId_whenPomXmlIsMalformed_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry("pom.xml", "<project><this-is-not-valid></project>");
 
         String result = ZipPomUtil.extractArtifactId(
@@ -110,7 +111,7 @@ class ZipPomUtilTest {
     }
 
     @Test
-    void extractVersion_whenPomXmlIsMalformed_shouldReturnNull() throws Exception {
+    void extractVersion_whenPomXmlIsMalformed_shouldReturnNull() throws IOException {
         byte[] zip = zipWithEntry("pom.xml", "not xml at all");
 
         String result = ZipPomUtil.extractVersion(
@@ -143,7 +144,7 @@ class ZipPomUtilTest {
     }
 
     @Test
-    void constructor_shouldBePrivate() throws Exception {
+    void constructor_shouldBePrivate() throws ReflectiveOperationException {
         Constructor<ZipPomUtil> constructor =
                 ZipPomUtil.class.getDeclaredConstructor();
 
@@ -155,7 +156,7 @@ class ZipPomUtilTest {
         assertThat(instance).isNotNull();
     }
 
-    private static byte[] zipWithEntry(String entryName, String content) throws Exception {
+    private static byte[] zipWithEntry(String entryName, String content) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {

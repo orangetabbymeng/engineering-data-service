@@ -31,7 +31,7 @@ class FileTypeResolverTest {
     }
 
     @Test
-    void constructor_shouldBePrivate() throws Exception {
+    void constructor_shouldBePrivate() throws ReflectiveOperationException {
         Constructor<FileTypeResolver> constructor =
                 FileTypeResolver.class.getDeclaredConstructor();
 

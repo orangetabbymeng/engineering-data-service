@@ -8,7 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -70,7 +70,7 @@ class FileUploadControllerTest {
     static class TestSecurityConfig {
 
         @Bean
-        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {
+        SecurityFilterChain testSecurityFilterChain(HttpSecurity http) {
             return http
                     .authorizeHttpRequests(auth -> auth
                             .requestMatchers(HttpMethod.POST, "/api/files/upload")
@@ -98,7 +98,7 @@ class FileUploadControllerTest {
                 AccessDeniedException.class,
                 AuthorizationDeniedException.class
         })
-        ResponseEntity<Void> handleAccessDenied(Exception ex) {
+        ResponseEntity<Void> handleAccessDenied() {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     }
@@ -112,19 +112,19 @@ class FileUploadControllerTest {
         );
     }
 
-    private static MockMultipartFile javaFile(String filename, String content) {
+    private static MockMultipartFile javaFile() {
         return new MockMultipartFile(
                 "files",
-                filename,
+                "Example.java",
                 MediaType.TEXT_PLAIN_VALUE,
-                content.getBytes(StandardCharsets.UTF_8)
+                "class Example {}".getBytes(StandardCharsets.UTF_8)
         );
     }
 
     @Test
     @WithMockUser(roles = "embedding-user")
     void uploadRegularFile_returnsAccepted_andCallsProcessor() throws Exception {
-        MockMultipartFile file = javaFile("Example.java", "class Example {}");
+        MockMultipartFile file = javaFile();
 
         Path stored = Path.of("/tmp/Example.java");
         when(storage.save(any(MultipartFile.class))).thenReturn(stored);
@@ -160,7 +160,7 @@ class FileUploadControllerTest {
     @Test
     @WithMockUser(roles = "embedding-admin")
     void uploadRegularFile_withoutVersion_isRejected() throws Exception {
-        MockMultipartFile file = javaFile("Example.java", "class Example {}");
+        MockMultipartFile file = javaFile();
 
         mvc.perform(multipart(UPLOAD_URL)
                         .file(file)
@@ -223,7 +223,7 @@ class FileUploadControllerTest {
 
     @Test
     void upload_withoutAuthentication_isUnauthorized() throws Exception {
-        MockMultipartFile file = javaFile("Example.java", "class Example {}");
+        MockMultipartFile file = javaFile();
 
         mvc.perform(multipart(UPLOAD_URL)
                         .file(file)
@@ -235,7 +235,7 @@ class FileUploadControllerTest {
     @Test
     @WithMockUser(roles = "wrong-role")
     void upload_withWrongRole_isForbidden() throws Exception {
-        MockMultipartFile file = javaFile("Example.java", "class Example {}");
+        MockMultipartFile file = javaFile();
 
         mvc.perform(multipart(UPLOAD_URL)
                         .file(file)

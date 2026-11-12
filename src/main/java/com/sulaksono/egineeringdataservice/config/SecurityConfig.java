@@ -1,12 +1,12 @@
 package com.sulaksono.egineeringdataservice.config;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -21,8 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-@Configuration
-@EnableWebSecurity
+@Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
 public class SecurityConfig {
 
@@ -31,7 +30,9 @@ public class SecurityConfig {
     private static final String ASSISTANT_ADMIN = "assistant-admin";
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationConverter jwtAuthenticationConverter) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -54,33 +55,34 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
 
         return http.build();
     }
 
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtAuthenticationConverter c = new JwtAuthenticationConverter();
-        c.setJwtGrantedAuthoritiesConverter(keycloakRolesConverter());
-        return c;
+    public JwtAuthenticationConverter jwtAuthenticationConverter(
+            Converter<@NonNull Jwt, @NonNull Collection<GrantedAuthority>> keycloakRolesConverter) {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(keycloakRolesConverter);
+        return converter;
     }
 
     /**
      * Maps Keycloak roles to Spring Security authorities.
      * Reads from:
      * - realm_access.roles
-     * - resource_access.<client>.roles (all clients)
-     *
+     * - resource_access.&lt;client&gt;.roles (all clients)
+     * <p>
      * Produces authorities like: ROLE_embedding-admin, ROLE_assistant-admin, ROLE_embedding-user
      */
     @Bean
-    public Converter<Jwt, Collection<GrantedAuthority>> keycloakRolesConverter() {
+    public Converter<@NonNull Jwt, @NonNull Collection<GrantedAuthority>> keycloakRolesConverter() {
         return this::extractKeycloakAuthorities;
     }
 
-    private Collection<GrantedAuthority> extractKeycloakAuthorities(Jwt jwt) {
+    private @NonNull Collection<GrantedAuthority> extractKeycloakAuthorities(@NonNull Jwt jwt) {
         Set<GrantedAuthority> authorities = new HashSet<>();
         addRolesFromAccessClaim(jwt.getClaim("realm_access"), authorities);
         addResourceRoles(jwt.getClaim("resource_access"), authorities);
