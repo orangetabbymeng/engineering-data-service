@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.sulaksono</groupId>
     <artifactId>engineering-data-service</artifactId>
-    <version>2.0.0-SB4</version>
+    <version>2.0.1-SB4</version>
     <name>engineering-data-service</name>
     <description>engineering-data-service</description>
     <url/>
