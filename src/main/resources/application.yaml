@@ -1,0 +1,83 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: engineering-data-service
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${keycloak_issuer_uri:${engineering_assistant_issuer_uri:https://hcidpgkeycloak.wittyforest-997b7bd9.southeastasia.azurecontainerapps.io/realms/nonprod-master}}
+
+  datasource:
+    url: ${pg_db_url}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: engineeringEmbeddingHikariCP
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      validation-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 0
+      initialization-fail-timeout: 1
+    username: ${pg_db_user}
+    password: ${pg_db_pass}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: engineering_reference
+
+  sql:
+    init:
+      mode: never
+
+  task:
+    execution:
+      thread-name-prefix: async-exec-
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 1000
+    scheduling:
+      thread-name-prefix: sched-
+      pool:
+        size: 2
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: ${swagger_oauth_client_id:embedding-service}
+      use-pkce-with-authorization-code-grant: true
+
+azure:
+  openai:
+    endpoint: ${oai_api_endpoint}
+    api-key: ${oai_api_key}
+    embedding-model-deployment: ${oai_embedding_model_deployment}
+
+storage:
+  location: ${user.home}/file-ingestor/uploads
+
+vector:
+  include-path-depth: 2       # 0 = file name only; 2 = e.g. resources/application.yaml
+  max-chunks-per-file: 100
+
+logging:
+  level:
+    root: ${root_log_level:INFO}
+    org.hibernate.SQL: ${hibernate_log_level:INFO}
+    com.sulaksono.egineeringdataservice: ${service_log_level:INFO}
