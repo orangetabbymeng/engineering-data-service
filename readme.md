@@ -301,7 +301,8 @@ Recognized application roles are:
 | Endpoint group | Effective access |
 |---|---|
 | `POST /api/files/upload` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
-| `POST /api/embeddings/search` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
+| `POST /api/embeddings/search`, `/literal-search`, or `/generate` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
+| `GET /api/canonical-files/{id}` | `embedding-user`, `embedding-admin`, or `assistant-admin` |
 | Other `/api/**` endpoints | `embedding-admin` or `assistant-admin` |
 | Non-API resources, including Swagger UI and OpenAPI JSON | Publicly reachable |
 
@@ -503,6 +504,7 @@ Request fields:
 | `moduleVersion` | No | Exact module-version filter |
 | `includeDeprecated` | No | Include deprecated chunks; defaults to `false` |
 | `mode` | No | `SEMANTIC`, `LEXICAL`, or `HYBRID`; defaults to `SEMANTIC` |
+| `maxDistance` | No | Positive maximum cosine distance for semantic candidates |
 
 Example:
 
@@ -518,13 +520,25 @@ curl --request POST 'http://localhost:8080/api/embeddings/search' \
   }'
 ```
 
-The response is a JSON array ordered from highest to lowest relevance. Each result contains `score`, `content`, `fileName`, `path`, `module`, `moduleVersion`, `fileType`, `chunkIndex`, `chunkCount`, and `deprecated`.
+The response is a JSON array ordered from highest to lowest relevance. Each result contains the chunk `id`, `canonicalFileId`, mode-specific `score`, semantic `distance` when applicable, content, source metadata, chunk position, and deprecation state.
 
 - `SEMANTIC` embeds the query and reports `1 - cosine_distance`.
 - `LEXICAL` uses `websearch_to_tsquery` with the `simple` dictionary and reports PostgreSQL text rank. It does not call Azure OpenAI.
 - `HYBRID` retrieves candidates from both modes and reports a reciprocal-rank-fusion score. Raw semantic and lexical scores are not directly averaged.
 
 The agent must send a Keycloak bearer token containing `embedding-user`, `embedding-admin`, or `assistant-admin`.
+
+### Other knowledge-tool endpoints
+
+These endpoints complete the REST boundary needed to remove direct Azure OpenAI and engineering-corpus database access from a consuming chat service:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/embeddings/generate` | Generates a vector for `{\"text\":\"...\"}`; text is trimmed and limited to 8,000 characters |
+| `POST /api/embeddings/literal-search` | Case-insensitive exact-substring search over `content`, `path`, `fileName`, or `module`; query limit is 500 characters |
+| `GET /api/canonical-files/{id}` | Returns complete canonical-file content and source metadata |
+
+All successful responses include `Cache-Control: no-store`. Literal-search `%`, `_`, and backslash characters are escaped instead of being interpreted as SQL wildcards. The generation response includes deployment, dimensions, the complete vector, and explicit model provenance.
 
 ### Deprecate or restore a module
 

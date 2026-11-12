@@ -26,21 +26,29 @@ import java.util.Set;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final String EMBEDDING_USER = "embedding-user";
+    private static final String EMBEDDING_ADMIN = "embedding-admin";
+    private static final String ASSISTANT_ADMIN = "assistant-admin";
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Upload and semantic search: embedding-user + admins
+                        // Upload and read-only knowledge APIs: embedding-user + admins
                         .requestMatchers(HttpMethod.POST,
                                 "/api/files/upload",
-                                "/api/embeddings/search")
-                        .hasAnyRole("embedding-user", "embedding-admin", "assistant-admin")
+                                "/api/embeddings/search",
+                                "/api/embeddings/literal-search",
+                                "/api/embeddings/generate")
+                        .hasAnyRole(EMBEDDING_USER, EMBEDDING_ADMIN, ASSISTANT_ADMIN)
+                        .requestMatchers(HttpMethod.GET, "/api/canonical-files/**")
+                        .hasAnyRole(EMBEDDING_USER, EMBEDDING_ADMIN, ASSISTANT_ADMIN)
 
                         // Everything else under /api/**: admins only
                         .requestMatchers("/api/**")
-                        .hasAnyRole("embedding-admin", "assistant-admin")
+                        .hasAnyRole(EMBEDDING_ADMIN, ASSISTANT_ADMIN)
 
                         // Non-API endpoints (health, swagger, etc.)
                         .anyRequest().permitAll()
