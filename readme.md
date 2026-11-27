@@ -262,7 +262,7 @@ The application uses the following environment variables directly:
 |---|---:|---|
 | `server.port` | `8080` | HTTP port |
 | `spring.servlet.multipart.max-file-size` | `8MB` | Maximum individual multipart file size |
-| `spring.servlet.multipart.max-request-size` | `10MB` | Maximum complete multipart request size |
+| `spring.servlet.multipart.max-request-size` | `8MB` | Maximum complete multipart request size |
 | `spring.jpa.hibernate.ddl-auto` | `none` | Schema changes are not performed at startup |
 | `spring.jpa.properties.hibernate.default_schema` | `engineering_reference` | Default persistence schema |
 | `storage.location` | `${user.home}/file-ingestor/uploads` | Temporary upload staging directory |
@@ -310,7 +310,7 @@ Recognized application roles are:
 
 > Swagger UI being publicly reachable does not make protected API operations public. Calling an `/api/**` endpoint still requires a valid bearer token and one of the roles allowed for that endpoint.
 
-CSRF is disabled because the API is stateless and bearer-token based.
+CSRF protection remains enabled for browser-facing endpoints. Stateless `/api/**` endpoints are exempt because they authenticate exclusively with bearer tokens and do not use cookie-based credentials.
 
 ---
 
