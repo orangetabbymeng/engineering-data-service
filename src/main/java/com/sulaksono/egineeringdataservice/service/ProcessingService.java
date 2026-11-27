@@ -51,13 +51,7 @@ public class ProcessingService {
 
         String requestId = MDC.get(MDC_REQUEST_ID);
 
-        log.debug(
-                "event=processing_start requestId={} file={} module={} version={}",
-                requestId,
-                filePath,
-                module,
-                moduleVersion
-        );
+        log.debug("event=processing_start requestId={}", requestId);
 
         try {
             validateInput(filePath, moduleVersion);
@@ -67,19 +61,10 @@ public class ProcessingService {
 
             String rawText = Files.readString(filePath, StandardCharsets.UTF_8);
 
-            log.debug(
-                    "event=file_read requestId={} file={} size={}chars",
-                    requestId,
-                    filePath,
-                    rawText.length()
-            );
+            log.debug("event=file_read requestId={} sizeChars={}", requestId, rawText.length());
 
             if (rawText.isBlank()) {
-                log.info(
-                        "event=processing_skipped requestId={} file={} reason=empty_content",
-                        requestId,
-                        filePath
-                );
+                log.info("event=processing_skipped requestId={} reason=empty_content", requestId);
                 return;
             }
 
@@ -98,40 +83,25 @@ public class ProcessingService {
 
             chunks = applyMaxChunksLimit(
                     requestId,
-                    trimmedPath,
                     chunks,
                     vecProps.maxChunksPerFile()
             );
 
             log.debug(
-                    "event=token_split requestId={} file={} chunks={} window={} overlap={}",
-                    requestId,
-                    filePath,
-                    chunks.size(),
-                    vecProps.chunkSizeTokens(),
-                    vecProps.chunkOverlapTokens()
-            );
+                    "event=token_split requestId={} chunks={} window={} overlap={}",
+                    requestId, chunks.size(), vecProps.chunkSizeTokens(),
+                    vecProps.chunkOverlapTokens());
 
             FileEmbedding.Details details = new FileEmbedding.Details(
                     fileName, trimmedPath, module, type, moduleVersion);
             persistEmbeddings(requestId, details, chunks, canonical);
 
-            log.info(
-                    "event=processing_complete requestId={} file={} module={} chunks={}",
-                    requestId,
-                    trimmedPath,
-                    module,
-                    chunks.size()
-            );
+            log.info("event=processing_complete requestId={} chunks={}",
+                    requestId, chunks.size());
 
         } catch (Exception e) {
-            log.error(
-                    "event=processing_error requestId={} file={} message={}",
-                    requestId,
-                    filePath,
-                    e.getMessage(),
-                    e
-            );
+            log.error("event=processing_error requestId={} exceptionType={}",
+                    requestId, e.getClass().getSimpleName());
         } finally {
             deleteLocalFileQuietly(requestId, filePath);
         }
@@ -180,14 +150,8 @@ public class ProcessingService {
 
         CanonicalFile saved = canonicalFileRepository.save(canonical);
 
-        log.info(
-                "event=canonical_file_upserted requestId={} path={} module={} version={} id={}",
-                requestId,
-                data.path(),
-                data.module(),
-                data.moduleVersion(),
-                saved.getId()
-        );
+        log.info("event=canonical_file_upserted requestId={} id={}",
+                requestId, saved.getId());
 
         return saved;
     }
@@ -199,7 +163,6 @@ public class ProcessingService {
 
     private List<String> applyMaxChunksLimit(
             String requestId,
-            String trimmedPath,
             List<String> chunks,
             int maxChunks) {
 
@@ -207,9 +170,8 @@ public class ProcessingService {
 
         if (maxChunks > 0 && originalChunks > maxChunks) {
             log.info(
-                    "event=file_truncated requestId={} file={} originalChunks={} processedChunks={} skippedChunks={}",
+                    "event=file_truncated requestId={} originalChunks={} processedChunks={} skippedChunks={}",
                     requestId,
-                    trimmedPath,
                     originalChunks,
                     maxChunks,
                     originalChunks - maxChunks
@@ -248,13 +210,8 @@ public class ProcessingService {
                     canonicalFile
             ));
 
-            log.info(
-                    "event=chunk_persisted requestId={} file={} chunkIdx={}/{}",
-                    requestId,
-                    details.fileName(),
-                    idx + 1,
-                    total
-            );
+            log.info("event=chunk_persisted requestId={} chunkIdx={}/{}",
+                    requestId, idx + 1, total);
         }
     }
 
@@ -265,26 +222,13 @@ public class ProcessingService {
 
         try {
             if (Files.deleteIfExists(filePath)) {
-                log.debug(
-                        "event=file_delete requestId={} file={} result=deleted",
-                        requestId,
-                        filePath
-                );
+                log.debug("event=file_delete requestId={} result=deleted", requestId);
             } else {
-                log.debug(
-                        "event=file_delete requestId={} file={} result=not_found",
-                        requestId,
-                        filePath
-                );
+                log.debug("event=file_delete requestId={} result=not_found", requestId);
             }
         } catch (java.io.IOException e) {
-            log.debug(
-                    "event=file_delete_failed requestId={} file={} message={}",
-                    requestId,
-                    filePath,
-                    e.getMessage(),
-                    e
-            );
+            log.debug("event=file_delete_failed requestId={} exceptionType={}",
+                    requestId, e.getClass().getSimpleName());
         }
     }
 

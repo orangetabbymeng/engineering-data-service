@@ -25,6 +25,7 @@ public class ReembeddingService {
 
     private static final String MDC_REQUEST_ID = "requestId";
 
+    // Log only trusted event metadata; module and file fields originate from clients.
     private final FileEmbeddingRepository repo;
     private final EmbeddingService embedSvc;
 
@@ -35,40 +36,21 @@ public class ReembeddingService {
 
         validateModule(module);
 
-        log.info(
-                "event=reembed_start requestId={} module={}",
-                requestId,
-                module
-        );
+        log.info("event=reembed_start requestId={}", requestId);
 
         try {
             List<FileEmbedding> rows = safeRows(repo.findByModule(module));
 
-            log.debug(
-                    "event=row_fetch requestId={} module={} rows={}",
-                    requestId,
-                    module,
-                    rows.size()
-            );
+            log.debug("event=row_fetch requestId={} rows={}", requestId, rows.size());
 
             for (FileEmbedding row : rows) {
                 reembedRow(requestId, row);
             }
 
-            log.info(
-                    "event=reembed_complete requestId={} module={} rows={}",
-                    requestId,
-                    module,
-                    rows.size()
-            );
+            log.info("event=reembed_complete requestId={} rows={}", requestId, rows.size());
         } catch (Exception e) {
-            log.error(
-                    "event=reembed_error requestId={} module={} message={}",
-                    requestId,
-                    module,
-                    e.getMessage(),
-                    e
-            );
+            log.error("event=reembed_error requestId={} exceptionType={}",
+                    requestId, e.getClass().getSimpleName());
             throw e;
         }
     }
@@ -110,20 +92,10 @@ public class ReembeddingService {
             row.setEmbedding(vector);
             repo.save(row);
 
-            log.debug(
-                    "event=row_reembedded requestId={} fileName={} path={}",
-                    requestId,
-                    row.getFileName(),
-                    row.getPath()
-            );
+            log.debug("event=row_reembedded requestId={}", requestId);
         } catch (Exception e) {
-            log.error(
-                    "event=row_reembed_error requestId={} fileName={} message={}",
-                    requestId,
-                    row.getFileName(),
-                    e.getMessage(),
-                    e
-            );
+            log.error("event=row_reembed_error requestId={} exceptionType={}",
+                    requestId, e.getClass().getSimpleName());
         }
     }
 }

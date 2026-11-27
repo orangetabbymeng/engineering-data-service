@@ -1,4 +1,4 @@
-/* bootstrap DDL – pgvector + metadata columns */
+-- Bootstrap DDL – pgvector + metadata columns
 create schema if not exists engineering_reference;
 
 create extension if not exists pgcrypto;

@@ -33,13 +33,13 @@ public final class ZipUtil {
     private static final Logger log = LoggerFactory.getLogger(ZipUtil.class);
 
     /** Per-entry uncompressed byte limit (e.g., skip huge TXT). */
-    public static final long MAX_ENTRY_BYTES = 512L * 1024; // 256 KB
+    public static final long MAX_ENTRY_BYTES = 512L * 1024; // 512 KB
 
     /** Total uncompressed bytes limit across extracted entries (zip bomb guardrail). */
     public static final long MAX_TOTAL_BYTES = 10L * 1024 * 1024; // 10 MB
 
     /** Max number of entries we will consider (zip bomb guardrail). */
-    public static final int MAX_ENTRIES = 10_000;
+    public static final int MAX_ENTRIES = 1_000;
 
     private ZipUtil() { }
 
@@ -72,20 +72,18 @@ public final class ZipUtil {
             while (entries.hasMoreElements() && state.canProcess(limits)) {
                 ZipEntry entry = entries.nextElement();
                 if (!entry.isDirectory()) {
-                    processFileEntry(zipFile, entry, zipPath, targetDir,
-                            requestId, limits, state);
+                    processFileEntry(zipFile, entry, targetDir, requestId, limits, state);
                 }
             }
             if (entries.hasMoreElements() && state.reachedEntryLimit(limits)) {
                 state.stop();
-                log.warn("event=zip_extract_stopped requestId={} zip={} reason=max_entries limit={}",
-                        requestId, zipPath.getFileName(), maxEntries);
+                log.warn("event=zip_extract_stopped requestId={} reason=max_entries limit={}",
+                        requestId, maxEntries);
             }
         }
 
-        log.info("event=zip_extract_complete requestId={} zip={} extractedCount={} skippedCount={} totalExtractedBytes={} stoppedByLimit={}",
-                requestId, zipPath.getFileName(), state.extractedCount, state.skippedCount,
-                state.totalBytes, state.stopped);
+        log.info("event=zip_extract_complete requestId={} extractedCount={} skippedCount={} totalExtractedBytes={} stoppedByLimit={}",
+                requestId, state.extractedCount, state.skippedCount, state.totalBytes, state.stopped);
 
         return state.extracted;
     }
@@ -123,18 +121,18 @@ public final class ZipUtil {
         return state.extracted;
     }
 
-    private static void processFileEntry(ZipFile zipFile, ZipEntry entry, Path zipPath,
+    private static void processFileEntry(ZipFile zipFile, ZipEntry entry,
                                          Path targetDir, String requestId,
                                          ExtractionLimits limits, ExtractionState state) throws IOException {
         String entryName = sanitizeEntryName(entry.getName());
         Path resolved = resolveZipSlipSafe(targetDir, entryName);
-        if (shouldSkip(entry, resolved, requestId, zipPath.getFileName(), limits, state)) {
+        if (shouldSkip(entry, resolved, requestId, limits, state)) {
             return;
         }
 
         long remaining = limits.maxTotalBytes() - state.totalBytes;
         if (remaining <= 0) {
-            stopForTotalLimit(requestId, zipPath.getFileName(), limits, state);
+            stopForTotalLimit(requestId, limits, state);
             return;
         }
 
@@ -145,11 +143,11 @@ public final class ZipUtil {
         } catch (EntryTooLargeException e) {
             state.skippedCount++;
             deleteQuietly(temporary);
-            log.info("event=zip_entry_skipped requestId={} zip={} entry={} reason=too_large limit={}",
-                    requestId, zipPath.getFileName(), entryName, limits.maxEntryBytes());
+            log.info("event=zip_entry_skipped requestId={} reason=too_large limit={}",
+                    requestId, limits.maxEntryBytes());
         } catch (TotalLimitReachedException e) {
             deleteQuietly(temporary);
-            stopForTotalLimit(requestId, zipPath.getFileName(), limits, state);
+            stopForTotalLimit(requestId, limits, state);
         }
     }
 
@@ -158,14 +156,14 @@ public final class ZipUtil {
                                            ExtractionLimits limits, ExtractionState state) throws IOException {
         String entryName = sanitizeEntryName(entry.getName());
         Path resolved = resolveZipSlipSafe(targetDir, entryName);
-        if (shouldSkip(entry, resolved, requestId, null, limits, state)) {
+        if (shouldSkip(entry, resolved, requestId, limits, state)) {
             drainEntry(input);
             return;
         }
 
         long remaining = limits.maxTotalBytes() - state.totalBytes;
         if (remaining <= 0) {
-            stopForTotalLimit(requestId, null, limits, state);
+            stopForTotalLimit(requestId, limits, state);
             return;
         }
 
@@ -176,30 +174,27 @@ public final class ZipUtil {
         } catch (EntryTooLargeException e) {
             state.skippedCount++;
             deleteQuietly(temporary);
-            log.info("event=zip_entry_skipped requestId={} entry={} reason=too_large limit={}",
-                    requestId, entryName, limits.maxEntryBytes());
+            log.info("event=zip_entry_skipped requestId={} reason=too_large limit={}",
+                    requestId, limits.maxEntryBytes());
             drainEntry(input);
         } catch (TotalLimitReachedException e) {
             deleteQuietly(temporary);
-            stopForTotalLimit(requestId, null, limits, state);
+            stopForTotalLimit(requestId, limits, state);
         }
     }
 
     private static boolean shouldSkip(ZipEntry entry, Path resolved, String requestId,
-                                      Path zipName, ExtractionLimits limits,
-                                      ExtractionState state) {
-        String entryName = sanitizeEntryName(entry.getName());
+                                      ExtractionLimits limits, ExtractionState state) {
         if (limits.skipUnsupportedTypes()
                 && FileTypeResolver.resolve(resolved.getFileName().toString()) == FileType.UNKNOWN) {
             state.skippedCount++;
-            log.info("event=zip_entry_skipped requestId={} zip={} entry={} reason=unsupported_type",
-                    requestId, zipName, entryName);
+            log.info("event=zip_entry_skipped requestId={} reason=unsupported_type", requestId);
             return true;
         }
         if (entry.getSize() > limits.maxEntryBytes()) {
             state.skippedCount++;
-            log.info("event=zip_entry_skipped requestId={} zip={} entry={} reason=too_large declaredSize={} limit={}",
-                    requestId, zipName, entryName, entry.getSize(), limits.maxEntryBytes());
+            log.info("event=zip_entry_skipped requestId={} reason=too_large declaredSize={} limit={}",
+                    requestId, entry.getSize(), limits.maxEntryBytes());
             return true;
         }
         return false;
@@ -219,11 +214,11 @@ public final class ZipUtil {
         state.totalBytes += written;
     }
 
-    private static void stopForTotalLimit(String requestId, Path zipName,
+    private static void stopForTotalLimit(String requestId,
                                           ExtractionLimits limits, ExtractionState state) {
         state.stop();
-        log.warn("event=zip_extract_stopped requestId={} zip={} reason=max_total_bytes limit={}",
-                requestId, zipName, limits.maxTotalBytes());
+        log.warn("event=zip_extract_stopped requestId={} reason=max_total_bytes limit={}",
+                requestId, limits.maxTotalBytes());
     }
 
     private static String sanitizeEntryName(String name) {
@@ -236,7 +231,7 @@ public final class ZipUtil {
     private static Path resolveZipSlipSafe(Path targetDir, String entryName) throws IOException {
         Path resolved = targetDir.resolve(entryName).normalize();
         if (!resolved.startsWith(targetDir.normalize())) {
-            throw new IOException("Zip-Slip attack detected: " + entryName);
+            throw new IOException("Zip-Slip attack detected");
         }
         return resolved;
     }
@@ -268,7 +263,7 @@ public final class ZipUtil {
     private static void drainEntry(InputStream in) throws IOException {
         byte[] buf = new byte[8192];
         while (in.read(buf) != -1) {
-            log.debug("event=draining_buffer");
+            // Consume the current entry so the next ZIP entry can be read safely.
         }
     }
 

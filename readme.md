@@ -97,7 +97,7 @@ Unsupported standalone files are rejected. Unsupported entries inside a ZIP are 
 |---|---:|
 | Maximum uncompressed size per extracted entry | 512 KiB |
 | Maximum total uncompressed extracted data | 10 MiB |
-| Maximum archive entries considered | 10,000 |
+| Maximum archive entries considered | 1,000 |
 
 ZIP extraction normalizes paths and rejects entries that would escape the temporary extraction directory.
 
@@ -166,8 +166,8 @@ Spring Boot REST API
 ### `FileStorageService`
 
 - Creates the configured upload directory at startup
-- Sanitizes uploaded names to their base name and extension
-- Adds a unique suffix before saving
+- Replaces uploaded names with random UUIDs and allow-listed extensions
+- Never uses a client-supplied base name for a storage path
 - Prevents writes outside the configured storage root
 
 The storage location is temporary staging space. Processing removes each local file in a `finally` block.
@@ -261,8 +261,8 @@ The application uses the following environment variables directly:
 | Property | Current value | Description |
 |---|---:|---|
 | `server.port` | `8080` | HTTP port |
-| `spring.servlet.multipart.max-file-size` | `100MB` | Maximum individual multipart file size |
-| `spring.servlet.multipart.max-request-size` | `100MB` | Maximum complete multipart request size |
+| `spring.servlet.multipart.max-file-size` | `8MB` | Maximum individual multipart file size |
+| `spring.servlet.multipart.max-request-size` | `10MB` | Maximum complete multipart request size |
 | `spring.jpa.hibernate.ddl-auto` | `none` | Schema changes are not performed at startup |
 | `spring.jpa.properties.hibernate.default_schema` | `engineering_reference` | Default persistence schema |
 | `storage.location` | `${user.home}/file-ingestor/uploads` | Temporary upload staging directory |
@@ -697,7 +697,7 @@ Verify that:
 
 ### ZIP content is missing
 
-Entries can be skipped because they are unsupported, exceed 512 KiB uncompressed, or occur after the archive reaches its 10 MiB/10,000-entry limits. Review `zip_entry_skipped` and `zip_extract_stopped` events.
+Entries can be skipped because they are unsupported, exceed 512 KiB uncompressed, or occur after the archive reaches its 10 MiB/1,000-entry limits. Review `zip_entry_skipped` and `zip_extract_stopped` events.
 
 ### Module deprecation appears partially updated
 
