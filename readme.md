@@ -310,7 +310,7 @@ Recognized application roles are:
 
 > Swagger UI being publicly reachable does not make protected API operations public. Calling an `/api/**` endpoint still requires a valid bearer token and one of the roles allowed for that endpoint.
 
-CSRF protection remains enabled for browser-facing endpoints. Stateless `/api/**` endpoints are exempt because they authenticate exclusively with bearer tokens and do not use cookie-based credentials.
+CSRF protection remains enabled for unsafe browser and cookie-based requests. It is not required when the request explicitly supplies an `Authorization: Bearer` credential, because bearer tokens are not ambient browser authority.
 
 ---
 

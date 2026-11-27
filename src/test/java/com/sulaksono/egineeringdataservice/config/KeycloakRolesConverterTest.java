@@ -3,8 +3,11 @@ package com.sulaksono.egineeringdataservice.config;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -20,6 +23,31 @@ class KeycloakRolesConverterTest {
     @BeforeEach
     void setup() {
         converter = new SecurityConfig().keycloakRolesConverter();
+    }
+
+    @Test
+    void shouldRequireCsrfForUnsafeRequestsWithoutBearerToken() {
+        RequestMatcher matcher = SecurityConfig.csrfProtectionMatcher();
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/files/upload");
+
+        assertThat(matcher.matches(request)).isTrue();
+    }
+
+    @Test
+    void shouldNotRequireCsrfForRequestsUsingBearerToken() {
+        RequestMatcher matcher = SecurityConfig.csrfProtectionMatcher();
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/files/upload");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer test-token");
+
+        assertThat(matcher.matches(request)).isFalse();
+    }
+
+    @Test
+    void shouldNotRequireCsrfForSafeRequests() {
+        RequestMatcher matcher = SecurityConfig.csrfProtectionMatcher();
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/swagger-ui.html");
+
+        assertThat(matcher.matches(request)).isFalse();
     }
 
     @Test

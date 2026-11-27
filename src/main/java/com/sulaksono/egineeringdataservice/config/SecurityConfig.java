@@ -4,6 +4,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,9 +14,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,9 +37,9 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter) {
         http
-                // The API authenticates exclusively with bearer tokens and does not use cookies.
-                // Keep CSRF protection for browser-facing endpoints, exempting only stateless APIs.
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+                // Bearer credentials are supplied explicitly and are not ambient browser authority.
+                // Cookie/browser requests retain Spring Security's default CSRF protection.
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(csrfProtectionMatcher()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Upload and read-only knowledge APIs: embedding-user + admins
@@ -60,6 +64,15 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    static RequestMatcher csrfProtectionMatcher() {
+        return request -> {
+            String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+            boolean usesBearerToken = authorization != null
+                    && authorization.toLowerCase(Locale.ROOT).startsWith("bearer ");
+            return !usesBearerToken && CsrfFilter.DEFAULT_CSRF_MATCHER.matches(request);
+        };
     }
 
     @Bean
