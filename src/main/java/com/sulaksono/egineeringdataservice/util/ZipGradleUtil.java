@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,8 +15,8 @@ import java.util.zip.ZipInputStream;
 public final class ZipGradleUtil {
 
     private static final int MAX_ENTRY_BYTES = 1024 * 1024;
+    private static final int MAX_ENTRIES = 1_000;
 
-    // Fixed: Added ['\"] to match opening quote, and ([^'\"]+) to capture the value
     private static final Pattern ROOT_PROJECT_NAME =
             Pattern.compile("(?m)^\\s*rootProject\\.name\\s*=\\s*['\"]([^'\"]+)['\"]\\s*$");
 
@@ -70,8 +69,9 @@ public final class ZipGradleUtil {
 
         try (ZipInputStream zin = new ZipInputStream(zipStream)) {
             ZipEntry entry;
+            int entriesRead = 0;
 
-            while ((entry = zin.getNextEntry()) != null) {
+            while (entriesRead++ < MAX_ENTRIES && (entry = zin.getNextEntry()) != null) {
                 String result = readMatchingEntry(zin, entry, predicate, mapper);
                 zin.closeEntry();
                 if (result != null && !result.isBlank()) {
@@ -88,10 +88,12 @@ public final class ZipGradleUtil {
     private static @Nullable String readMatchingEntry(ZipInputStream input, ZipEntry entry,
                                             EntryNamePredicate predicate,
                                             ContentMapper mapper) throws IOException {
-        if (entry.isDirectory() || !predicate.test(baseName(entry.getName()))) {
+        if (entry.isDirectory() || !predicate.test(baseName(entry.getName()))
+                || entry.getSize() > MAX_ENTRY_BYTES) {
             return null;
         }
-        return mapper.map(readEntryAsString(input, MAX_ENTRY_BYTES));
+        String content = readEntryAsString(input, MAX_ENTRY_BYTES);
+        return content == null ? null : mapper.map(content);
     }
 
     private static String baseName(@Nullable String entryName) {
@@ -101,23 +103,22 @@ public final class ZipGradleUtil {
 
         String normalized = entryName.replace('\\', '/');
 
-        return Paths.get(normalized)
-                .getFileName()
-                .toString()
-                .toLowerCase(Locale.ROOT);
+        int separator = normalized.lastIndexOf('/');
+        return normalized.substring(separator + 1).toLowerCase(Locale.ROOT);
     }
 
-    private static String readEntryAsString(InputStream in, int maxBytes) throws IOException {
+    private static @Nullable String readEntryAsString(InputStream in, int maxBytes) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-
         byte[] buffer = new byte[8192];
         int total = 0;
         int read;
 
-        while (total < maxBytes
-                && (read = in.read(buffer, 0, Math.min(buffer.length, maxBytes - total))) != -1) {
-            out.write(buffer, 0, read);
+        while ((read = in.read(buffer, 0, Math.min(buffer.length, maxBytes + 1 - total))) != -1) {
             total += read;
+            if (total > maxBytes) {
+                return null;
+            }
+            out.write(buffer, 0, read);
         }
 
         return out.toString(StandardCharsets.UTF_8);

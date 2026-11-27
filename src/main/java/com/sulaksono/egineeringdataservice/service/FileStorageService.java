@@ -3,7 +3,6 @@ package com.sulaksono.egineeringdataservice.service;
 import com.sulaksono.egineeringdataservice.config.StorageProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
-import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -12,6 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Stores raw uploads on the local file system so processing can be retried independently.
@@ -22,6 +24,10 @@ public class FileStorageService {
 
     private static final Logger log =
             LoggerFactory.getLogger(FileStorageService.class);
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "java", "kt", "kts", "xml", "yaml", "yml", "json", "properties",
+            "gradle", "md", "txt", "sql", "zip");
 
     private final Path rootDir;
 
@@ -51,15 +57,12 @@ public class FileStorageService {
         }
 
         log.debug(
-                "event=file_save_start requestId={} originalName={} size={}",
+                "event=file_save_start requestId={} size={}",
                 requestId,
-                original,
                 file.getSize());
 
-        String base = FilenameUtils.getBaseName(original);
-        String ext = FilenameUtils.getExtension(original);
-        String generated = base + "-" + System.nanoTime()
-                + (ext.isBlank() ? "" : "." + ext);
+        String ext = safeExtension(original);
+        String generated = UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
         Path destination = rootDir.resolve(generated).normalize();
 
         if (!destination.startsWith(rootDir)) {
@@ -69,12 +72,19 @@ public class FileStorageService {
         Files.copy(file.getInputStream(), destination,
                 StandardCopyOption.REPLACE_EXISTING);
 
-        log.info(
-                "event=file_saved requestId={} storedName={} path={}",
-                requestId,
-                generated,
-                destination);
+        log.info("event=file_saved requestId={}", requestId);
 
         return destination;
+    }
+
+    private static String safeExtension(String original) {
+        int separator = Math.max(original.lastIndexOf('/'), original.lastIndexOf('\\'));
+        int dot = original.lastIndexOf('.');
+        if (dot <= separator || dot == original.length() - 1) {
+            return "";
+        }
+
+        String extension = original.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return ALLOWED_EXTENSIONS.contains(extension) ? extension : "";
     }
 }

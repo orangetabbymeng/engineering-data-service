@@ -80,8 +80,7 @@ public class FileUploadController {
                 module, fileVersion, repoCloneUrl, repoRef, pathInRepo);
         MDC.put(MDC_REQUEST_ID, requestId);
         try {
-            log.info("event=upload_start requestId={} module={} version={} fileCount={}",
-                    requestId, metadata.module(), metadata.fileVersion(), files.length);
+            log.info("event=upload_start requestId={} fileCount={}", requestId, files.length);
 
             UploadResults results = new UploadResults(new ArrayList<>(), new ArrayList<>());
 
@@ -105,19 +104,17 @@ public class FileUploadController {
                             UploadResults results, String requestId) {
 
         final String original = file.getOriginalFilename();
-        log.debug("event=file_received requestId={} fileName={} size={}",
-                requestId, original, file.getSize());
+        log.debug("event=file_received requestId={} size={}", requestId, file.getSize());
 
         String rejection = validate(file, original, metadata.fileVersion());
         if (rejection != null) {
-            log.warn("event=file_rejected requestId={} reason=\"{}\"", requestId, rejection);
+            log.warn("event=file_rejected requestId={}", requestId);
             results.rejected().add(rejection);
             return;
         }
 
         boolean isZip = isZip(original);
-        log.debug("event=file_validated requestId={} fileName={} isZip={}",
-                requestId, original, isZip);
+        log.debug("event=file_validated requestId={} isZip={}", requestId, isZip);
 
         try {
             if (isZip) {
@@ -126,8 +123,8 @@ public class FileUploadController {
                 handleRegular(file, original, metadata, results.accepted(), requestId);
             }
         } catch (Exception e) {
-            log.error("event=file_failure requestId={} fileName={} error={}",
-                    requestId, original, e.getMessage(), e);
+            log.error("event=file_failure requestId={} exceptionType={}",
+                    requestId, e.getClass().getSimpleName(), e);
             results.rejected().add(original + " (" + e.getMessage() + ")");
         }
     }
@@ -136,7 +133,7 @@ public class FileUploadController {
                                UploadMetadata metadata, List<String> accepted,
                                String requestId) throws IOException {
         Path stored = storage.save(file);
-        log.debug("event=file_saved requestId={} path={}", requestId, stored);
+        log.debug("event=file_saved requestId={}", requestId);
 
         String effectiveModule = StringUtils.hasText(metadata.module())
                 && !FROM_PACKAGE.equalsIgnoreCase(metadata.module())
@@ -146,7 +143,7 @@ public class FileUploadController {
         processor.processAsync(stored, effectiveModule, metadata.fileVersion(),
                 metadata.repoCloneUrl(), metadata.repoRef(), metadata.pathInRepo());
         accepted.add(original);
-        log.info("event=file_accepted requestId={} fileName={}", requestId, original);
+        log.info("event=file_accepted requestId={}", requestId);
     }
 
     private void handleZip(MultipartFile file, String original,
@@ -154,14 +151,14 @@ public class FileUploadController {
                            String requestId) throws IOException {
 
         Path zipPath = storage.save(file);
-        log.debug("event=zip_saved requestId={} path={}", requestId, zipPath);
+        log.debug("event=zip_saved requestId={}", requestId);
 
         Path extractDir = null;
         try {
             String derivedModule  = resolveZipModule(metadata.module(), zipPath);
             String derivedVersion = resolveZipVersion(metadata.fileVersion(), zipPath);
-            log.debug("event=zip_metadata requestId={} derivedModule={} derivedVersion={}",
-                    requestId, derivedModule, derivedVersion);
+            log.debug("event=zip_metadata_resolved requestId={} modulePresent={} versionPresent={}",
+                    requestId, StringUtils.hasText(derivedModule), StringUtils.hasText(derivedVersion));
 
             if (!StringUtils.hasText(derivedVersion)) {
                 results.rejected().add(original + " (missing version in package and request)");
@@ -178,7 +175,7 @@ public class FileUploadController {
                             metadata.repoCloneUrl(), metadata.repoRef(), metadata.pathInRepo()));
 
             results.accepted().add(original);
-            log.info("event=zip_file_accepted requestId={} fileName={}", requestId, original);
+            log.info("event=zip_file_accepted requestId={}", requestId);
         } finally {
             deleteQuietly(zipPath);
             deleteDirQuietly(extractDir);
@@ -239,8 +236,8 @@ public class FileUploadController {
         try (InputStream in = Files.newInputStream(zipPath)) {
             return reader.read(in);
         } catch (IOException e) {
-            log.warn("event=zip_inspect_failed requestId={} zip={} msg={}",
-                    MDC.get(MDC_REQUEST_ID), zipPath.getFileName(), e.getMessage());
+            log.warn("event=zip_inspect_failed requestId={} exceptionType={}",
+                    MDC.get(MDC_REQUEST_ID), e.getClass().getSimpleName());
             return null;
         }
     }
@@ -250,12 +247,12 @@ public class FileUploadController {
     private void deleteQuietly(Path path) {
         if (path == null) return;
         try {
-            if (Files.deleteIfExists(path) && log.isDebugEnabled()) {
-                log.debug("event=temp_deleted requestId={} path={}", MDC.get(MDC_REQUEST_ID), path);
+            if (Files.deleteIfExists(path)) {
+                log.debug("event=temp_deleted requestId={}", MDC.get(MDC_REQUEST_ID));
             }
         } catch (IOException ex) {
-            log.warn("event=temp_delete_failed requestId={} path={} msg={}",
-                    MDC.get(MDC_REQUEST_ID), path, ex.getMessage());
+            log.warn("event=temp_delete_failed requestId={} exceptionType={}",
+                    MDC.get(MDC_REQUEST_ID), ex.getClass().getSimpleName());
         }
     }
 
@@ -264,8 +261,8 @@ public class FileUploadController {
         try {
             FileSystemUtils.deleteRecursively(dir);
         } catch (IOException ex) {
-            log.warn("event=temp_dir_delete_failed requestId={} path={} msg={}",
-                    MDC.get(MDC_REQUEST_ID), dir, ex.getMessage());
+            log.warn("event=temp_dir_delete_failed requestId={} exceptionType={}",
+                    MDC.get(MDC_REQUEST_ID), ex.getClass().getSimpleName());
         }
     }
 
