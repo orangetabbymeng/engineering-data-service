@@ -89,37 +89,19 @@ public class EmbeddingAdminController {
         final String requestId = UUID.randomUUID().toString();
         MDC.put(MDC_REQUEST_ID, requestId);
 
-        log.info(
-                "event=mark_deprecated_start requestId={} module={} deprecated={}",
-                requestId,
-                module,
-                deprecated
-        );
+        log.info("event=mark_deprecated_start requestId={} deprecated={}",
+                requestId, deprecated);
 
         try {
             int rows = embeddingRepository.markDeprecatedByModule(module, deprecated);
 
-            log.debug(
-                    "event=db_update requestId={} module={} rowsAffected={}",
-                    requestId,
-                    module,
-                    rows
-            );
-
-            log.debug(
-                    "event=reembed_trigger requestId={} module={}",
-                    requestId,
-                    module
-            );
+            log.debug("event=db_update requestId={} rowsAffected={}", requestId, rows);
+            log.debug("event=reembed_trigger requestId={}", requestId);
 
             reembed.reembedModule(module);
 
-            log.info(
-                    "event=mark_deprecated_complete requestId={} module={} rowsAffected={}",
-                    requestId,
-                    module,
-                    rows
-            );
+            log.info("event=mark_deprecated_complete requestId={} rowsAffected={}",
+                    requestId, rows);
 
             return ResponseEntity.ok("updated: " + rows);
         } finally {
@@ -142,21 +124,13 @@ public class EmbeddingAdminController {
         final String requestId = UUID.randomUUID().toString();
         MDC.put(MDC_REQUEST_ID, requestId);
 
-        log.info(
-                "event=hard_delete_start requestId={} module={}",
-                requestId,
-                module
-        );
+        log.info("event=hard_delete_start requestId={}", requestId);
 
         try {
             embeddingRepository.deleteByModule(module);
             canonicalFileRepository.deleteByModule(module);
 
-            log.info(
-                    "event=hard_delete_complete requestId={} module={}",
-                    requestId,
-                    module
-            );
+            log.info("event=hard_delete_complete requestId={}", requestId);
 
             return ResponseEntity.ok("deleted all rows for module: " + module);
         } finally {

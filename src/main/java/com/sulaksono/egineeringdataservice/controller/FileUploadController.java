@@ -80,7 +80,7 @@ public class FileUploadController {
                 module, fileVersion, repoCloneUrl, repoRef, pathInRepo);
         MDC.put(MDC_REQUEST_ID, requestId);
         try {
-            log.info("event=upload_start requestId={} fileCount={}", requestId, files.length);
+            log.info("event=upload_start requestId={}", requestId);
 
             UploadResults results = new UploadResults(new ArrayList<>(), new ArrayList<>());
 

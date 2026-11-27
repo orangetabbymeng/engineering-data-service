@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,25 @@ class LiteralEmbeddingSearchServiceTest {
 
     @Mock
     private NamedParameterJdbcTemplate jdbcTemplate;
+
+    @Test
+    void selectsOnlyFixedAllowlistedSqlStatements() {
+        when(jdbcTemplate.query(any(String.class), any(MapSqlParameterSource.class), any(RowMapper.class)))
+                .thenReturn(List.of());
+        LiteralEmbeddingSearchService service = new LiteralEmbeddingSearchService(jdbcTemplate);
+
+        for (LiteralSearchField field : LiteralSearchField.values()) {
+            service.search(new LiteralSearchRequest("query", field, 5, false));
+        }
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate, times(LiteralSearchField.values().length))
+                .query(sql.capture(), any(MapSqlParameterSource.class), any(RowMapper.class));
+        assertThat(sql.getAllValues())
+                .extracting(value -> value.substring(value.indexOf("AND ") + 4,
+                        value.indexOf(" ILIKE")))
+                .containsExactly("content", "path", "file_name", "module");
+    }
 
     @Test
     void searchesAllowlistedColumnAndEscapesWildcards() {
